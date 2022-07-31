@@ -1024,11 +1024,11 @@ func competitionScoreHandler(c echo.Context) error {
 	}
 
 	// / DELETEしたタイミングで参照が来ると空っぽのランキングになるのでロックする
-	fl, err := flockByTenantID(v.tenantID)
-	if err != nil {
-		return fmt.Errorf("error flockByTenantID: %w", err)
-	}
-	defer fl.Close()
+	// fl, err := flockByTenantID(v.tenantID)
+	// if err != nil {
+	// 	return fmt.Errorf("error flockByTenantID: %w", err)
+	// }
+	// defer fl.Close()
 	var rowNum int64
 	playerScoreRows := []PlayerScoreRow{}
 	for {
@@ -1078,8 +1078,11 @@ func competitionScoreHandler(c echo.Context) error {
 		})
 	}
 
-	if _, err := tenantDB.ExecContext(
-		ctx,
+	tx := tenantDB.MustBeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("error tenantDB.BeginTx: tenantID=%d, %w", v.tenantID, err)
+	}
+	if _, err := tx.ExecContext(ctx,
 		"DELETE FROM player_score WHERE tenant_id = ? AND competition_id = ?",
 		v.tenantID,
 		competitionID,
@@ -1087,13 +1090,12 @@ func competitionScoreHandler(c echo.Context) error {
 		return fmt.Errorf("error Delete player_score: tenantID=%d, competitionID=%s, %w", v.tenantID, competitionID, err)
 	}
 
-	query := `
-INSERT INTO player_score (id, tenant_id, player_id, competition_id, score, row_num, created_at, updated_at) 
-VALUES (:id, :tenant_id, :player_id, :competition_id, :score, :row_num, :created_at, :updated_at)
-`
-	if _, err = tenantDB.NamedExecContext(ctx, query, playerScoreRows); err != nil {
+	if _, err = tx.NamedExecContext(ctx, `INSERT INTO player_score (id, tenant_id, player_id, competition_id, score, row_num, created_at, updated_at) VALUES (:id, :tenant_id, :player_id, :competition_id, :score, :row_num, :created_at, :updated_at)`,
+		playerScoreRows,
+	); err != nil {
 		return fmt.Errorf("error bulk insert player_score: %w", err)
 	}
+	tx.Commit()
 
 	return c.JSON(http.StatusOK, SuccessResult{
 		Status: true,

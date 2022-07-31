@@ -9,6 +9,7 @@ RUN apt-get update && \
   apt-get -y install ./mysql-apt-config_*_all.deb && \
   apt-get -y update && \
   apt-get -y install mysql-client
+RUN apt-get -y install sysstat htop jq
 
 RUN useradd --uid=1001 --create-home isucon
 USER isucon
