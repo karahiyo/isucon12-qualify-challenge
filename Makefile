@@ -27,6 +27,8 @@ sqlite-trace:
 		dsq -s jsonl "SELECT statement, COUNT(1) as cnt, AVG(query_time) as avg, SUM(query_time) as sum FROM {} GROUP BY statement ORDER BY sum DESC" | jq .
 
 slow-on:
+	docker compose exec mysql touch $(MYSQL_SLOW_LOG)
+	docker compose exec mysql chmod 777 $(MYSQL_SLOW_LOG)
 	docker compose exec mysql mysql -uroot -proot -e "set global slow_query_log_file = '/tmp/mysql-slow.log'; set global long_query_time = 0.001; set global slow_query_log = ON;"
 
 slow-off:
