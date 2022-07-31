@@ -47,8 +47,10 @@ var (
 
 	adminDB *sqlx.DB
 
-	sqliteDriverName  = "sqlite3"
-	tenantPlayerCache *cache.Cache
+	sqliteDriverName = "sqlite3"
+
+	tenantPlayerCache      *cache.Cache
+	tenantCompetitionCache *cache.Cache
 )
 
 // 環境変数を取得する、なければデフォルト値を返す
@@ -174,6 +176,7 @@ func Run() {
 	defer adminDB.Close()
 
 	initializeTenantPlayerCache(context.Background())
+	initializeTenantCompetitionCache(context.Background())
 
 	port := getEnv("SERVER_APP_PORT", "3000")
 	e.Logger.Infof("starting isuports server on : %s ...", port)
@@ -397,10 +400,17 @@ type CompetitionRow struct {
 }
 
 // 大会を取得する
-func retrieveCompetition(ctx context.Context, tenantDB dbOrTx, id string) (*CompetitionRow, error) {
+func retrieveCompetition(ctx context.Context, tenantDB dbOrTx, id string, tenantID int64) (*CompetitionRow, error) {
 	var c CompetitionRow
-	if err := tenantDB.GetContext(ctx, &c, "SELECT * FROM competition WHERE id = ?", id); err != nil {
-		return nil, fmt.Errorf("error Select competition: id=%s, %w", id, err)
+	cacheKey := getTenantCompetitionCacheKey(tenantID, id)
+	cachedCompetition, found := tenantCompetitionCache.Get(cacheKey)
+	if found {
+		c = cachedCompetition.(CompetitionRow)
+	} else {
+		if err := tenantDB.GetContext(ctx, &c, "SELECT * FROM competition WHERE id = ?", id); err != nil {
+			return nil, fmt.Errorf("error Select competition: id=%s, %w", id, err)
+		}
+		tenantCompetitionCache.Set(cacheKey, c, 1*time.Minute)
 	}
 	return &c, nil
 }
@@ -517,7 +527,7 @@ type VisitHistorySummaryRow struct {
 
 // 大会ごとの課金レポートを計算する
 func billingReportByCompetition(ctx context.Context, tenantDB dbOrTx, tenantID int64, competitonID string) (*BillingReport, error) {
-	comp, err := retrieveCompetition(ctx, tenantDB, competitonID)
+	comp, err := retrieveCompetition(ctx, tenantDB, competitonID, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieveCompetition: %w", err)
 	}
@@ -949,7 +959,7 @@ func competitionFinishHandler(c echo.Context) error {
 	if id == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "competition_id required")
 	}
-	_, err = retrieveCompetition(ctx, tenantDB, id)
+	comp, err := retrieveCompetition(ctx, tenantDB, id, v.tenantID)
 	if err != nil {
 		// 存在しない大会
 		if errors.Is(err, sql.ErrNoRows) {
@@ -969,6 +979,11 @@ func competitionFinishHandler(c echo.Context) error {
 			now, now, id, err,
 		)
 	}
+	// キャッシュ更新
+	comp.FinishedAt = sql.NullInt64{Valid: true, Int64: now}
+	comp.UpdatedAt = now
+	tenantCompetitionCache.Set(getTenantCompetitionCacheKey(v.tenantID, id), *comp, 1*time.Minute)
+
 	return c.JSON(http.StatusOK, SuccessResult{Status: true})
 }
 
@@ -999,7 +1014,7 @@ func competitionScoreHandler(c echo.Context) error {
 	if competitionID == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "competition_id required")
 	}
-	comp, err := retrieveCompetition(ctx, tenantDB, competitionID)
+	comp, err := retrieveCompetition(ctx, tenantDB, competitionID, v.tenantID)
 	if err != nil {
 		// 存在しない大会
 		if errors.Is(err, sql.ErrNoRows) {
@@ -1225,7 +1240,7 @@ GROUP BY competition_id, score
 
 	psds := make([]PlayerScoreDetail, 0, len(pss))
 	for _, ps := range pss {
-		comp, err := retrieveCompetition(ctx, tenantDB, ps.CompetitionID)
+		comp, err := retrieveCompetition(ctx, tenantDB, ps.CompetitionID, v.tenantID)
 		if err != nil {
 			return fmt.Errorf("error retrieveCompetition: %w", err)
 		}
@@ -1291,7 +1306,7 @@ func competitionRankingHandler(c echo.Context) error {
 	}
 
 	// 大会の存在確認
-	competition, err := retrieveCompetition(ctx, tenantDB, competitionID)
+	competition, err := retrieveCompetition(ctx, tenantDB, competitionID, v.tenantID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return echo.NewHTTPError(http.StatusNotFound, "competition not found")
@@ -1586,6 +1601,16 @@ func initializeHandler(c echo.Context) error {
 
 func initializeTenantPlayerCache(ctx context.Context) error {
 	tenantPlayerCache = cache.New(1*time.Minute, 1*time.Minute)
+
+	return nil
+}
+
+func getTenantCompetitionCacheKey(tenantID int64, competitionID string) string {
+	return fmt.Sprintf("/tenant/%d/competition/%s", tenantID, competitionID)
+}
+
+func initializeTenantCompetitionCache(ctx context.Context) error {
+	tenantCompetitionCache = cache.New(1*time.Minute, 1*time.Minute)
 
 	return nil
 }

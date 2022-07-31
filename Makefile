@@ -29,8 +29,10 @@ restart-all-container:
 	docker compose up --build -d
 
 SQLITE_TRACE_LOG=/tmp/sqlite_trace.log
+SQLITE_TRACE_LOG_LIMIT=10000
 sqlite-trace:
-	docker compose cp webapp:$(SQLITE_TRACE_LOG) $(SQLITE_TRACE_LOG) | tail -n 10000 $(SQLITE_TRACE_LOG) | \
+	docker compose cp webapp:$(SQLITE_TRACE_LOG) $(SQLITE_TRACE_LOG) | \
+		tail -n $(SQLITE_TRACE_LOG_LIMIT) $(SQLITE_TRACE_LOG) | \
 		dsq -s jsonl "SELECT statement, COUNT(1) as cnt, AVG(query_time) as avg, SUM(query_time) as sum FROM {} GROUP BY statement ORDER BY sum DESC" | jq .
 
 slow-on:
@@ -47,7 +49,7 @@ pt-query-digest:
 
 ALPM="/api/player/competition/.+/ranking,/api/admin/tenants/billing,/api/organizer/players/add,/api/player/player/.+,/api/organizer/competition/.+/score,/api/organizer/competition/.+/finish,/api/organizer/player/.+/disqualified,/js,/css,/api/me"
 OUTFORMAT=count,2xx,3xx,4xx,5xx,method,uri,min,max,sum,avg,p99
-NGINX_LOG_LENGTH=10000
+NGINX_LOG_LIMIT=10000
 .PHONY: alp
 alp:
 	docker compose logs nginx --tail $(NGINX_LOG_LENGTH) --no-log-prefix | \
