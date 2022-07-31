@@ -1,5 +1,9 @@
-bench:
+.PHONY: bench
+bench: cleanlog
 	docker compose run bench ./bench
+
+cleanlog:
+	docker compose exec mysql cp /dev/null /tmp/mysql-slow.log
 
 install-tools:
 	brew install alp
