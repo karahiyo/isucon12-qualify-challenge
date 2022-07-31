@@ -6,21 +6,25 @@ small_bench: cleanlog
 	docker compose run bench ./bench -duration 10s
 
 cleanlog:
-	docker compose exec mysql cp /dev/null /tmp/mysql-slow.log
+	docker compose exec webapp cp /dev/null $(SQLITE_TRACE_LOG)
+	docker compose exec mysql cp /dev/null $(MYSQL_SLOW_LOG)
 
-install-tools:
+__install-tools:
 	brew install alp
 	brew install percona-toolkit
 	brew install dsq
 
+deploy-webapp:
+	docker compose up -d --no-deps --build webapp
+
 restart-all-container:
 	docker compose down
-	docker compose up -d
+	docker compose up --build -d
 
 SQLITE_TRACE_LOG=/tmp/sqlite_trace.log
 sqlite-trace:
 	docker compose cp webapp:$(SQLITE_TRACE_LOG) $(SQLITE_TRACE_LOG) | tail -n 10000 $(SQLITE_TRACE_LOG) | \
-		dsq -s jsonl "SELECT statement, AVG(query_time) as avg, SUM(query_time) as sum FROM {} GROUP BY statement ORDER BY sum DESC" | jq .
+		dsq -s jsonl "SELECT statement, COUNT(1) as cnt, AVG(query_time) as avg, SUM(query_time) as sum FROM {} GROUP BY statement ORDER BY sum DESC" | jq .
 
 slow-on:
 	docker compose exec mysql mysql -uroot -proot -e "set global slow_query_log_file = '/tmp/mysql-slow.log'; set global long_query_time = 0.001; set global slow_query_log = ON;"
