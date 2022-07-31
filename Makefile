@@ -17,6 +17,12 @@ __install-tools:
 deploy-webapp:
 	docker compose up -d --no-deps --build webapp
 
+restart-mysql:
+	docker compose up -d --no-deps mysql
+
+connect-admindb:
+	docker compose exec mysql mysql -uroot -proot isuports
+
 restart-all-container:
 	docker compose down
 	docker compose up --build -d
