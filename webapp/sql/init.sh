@@ -19,3 +19,11 @@ mysql -u"$ISUCON_DB_USER" \
 # SQLiteのデータベースを初期化
 rm -f ../tenant_db/*.db
 cp -r ../../initial_data/*.db ../tenant_db/
+
+tenantdbs="../tenant_db/*.db"
+for tenantdb in $tenantdbs; do
+  sqlite3 $tenantdb < ./tenant/01_additional_bootstrap.sql
+done
+
+#for
+#"CREATE INDEX IF NOT EXISTS player_score_tenant_comp_idx ON player_score(tenant_id, competition_id, player_id, row_num desc);"

@@ -174,7 +174,7 @@ func Run() {
 	adminDB.SetMaxOpenConns(10)
 	defer adminDB.Close()
 
-	tenantPlayerCache = cache.New(1*time.Minute, 1*time.Minute)
+	initializeTenantPlayerCache(context.Background())
 
 	port := getEnv("SERVER_APP_PORT", "3000")
 	e.Logger.Infof("starting isuports server on : %s ...", port)
@@ -1361,11 +1361,11 @@ func competitionRankingHandler(c echo.Context) error {
 	}
 
 	// player_scoreを読んでいるときに更新が走ると不整合が起こるのでロックを取得する
-	fl, err := flockByTenantID(v.tenantID)
-	if err != nil {
-		return fmt.Errorf("error flockByTenantID: %w", err)
-	}
-	defer fl.Close()
+	//fl, err := flockByTenantID(v.tenantID)
+	//if err != nil {
+	//	return fmt.Errorf("error flockByTenantID: %w", err)
+	//}
+	//defer fl.Close()
 	pss := []PlayerScoreRow{}
 	if err := tenantDB.SelectContext(
 		ctx,
@@ -1402,6 +1402,8 @@ func competitionRankingHandler(c echo.Context) error {
 		}
 		return ranks[i].Score > ranks[j].Score
 	})
+
+	// TODO: Top100だけあればおｋ。それにあわせてクエリ負荷下げる改善余地あり
 	pagedRanks := make([]CompetitionRank, 0, 100)
 	for i, rank := range ranks {
 		if int64(i) < rankAfter {
@@ -1618,7 +1620,13 @@ func initializeHandler(c echo.Context) error {
 		Lang: "go",
 	}
 
-	tenantPlayerCache = cache.New(1*time.Minute, 1*time.Minute)
+	initializeTenantPlayerCache(context.Background())
 
 	return c.JSON(http.StatusOK, SuccessResult{Status: true, Data: res})
+}
+
+func initializeTenantPlayerCache(ctx context.Context) error {
+	tenantPlayerCache = cache.New(1*time.Minute, 1*time.Minute)
+
+	return nil
 }
