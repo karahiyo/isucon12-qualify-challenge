@@ -521,13 +521,25 @@ func billingReportByCompetition(ctx context.Context, tenantDB dbOrTx, tenantID i
 	if err != nil {
 		return nil, fmt.Errorf("error retrieveCompetition: %w", err)
 	}
+	// 大会がまだ開催中の場合はbilling情報はすべて０値を返す
+	if !comp.FinishedAt.Valid {
+		return &BillingReport{
+			CompetitionID:     comp.ID,
+			CompetitionTitle:  comp.Title,
+			PlayerCount:       0,
+			VisitorCount:      0,
+			BillingPlayerYen:  0,
+			BillingVisitorYen: 0,
+			BillingYen:        0,
+		}, nil
+	}
 
 	// ランキングにアクセスした参加者のIDを取得する
 	vhs := []VisitHistorySummaryRow{}
 	if err := adminDB.SelectContext(
 		ctx,
 		&vhs,
-		"SELECT player_id, created_at AS min_created_at FROM visit_history2 WHERE tenant_id = ? AND competition_id = ?",
+		`SELECT player_id, created_at AS min_created_at FROM visit_history2 WHERE tenant_id = ? AND competition_id = ?`,
 		tenantID,
 		comp.ID,
 	); err != nil && err != sql.ErrNoRows {
@@ -1361,7 +1373,7 @@ func competitionRankingHandler(c echo.Context) error {
 		return ranks[i].Score > ranks[j].Score
 	})
 
-	// TODO: Top100だけあればおｋ。それにあわせてクエリ負荷下げる改善余地あり
+	// TODO: rank_afterでselect オフセット
 	pagedRanks := make([]CompetitionRank, 0, 100)
 	for i, rank := range ranks {
 		if int64(i) < rankAfter {

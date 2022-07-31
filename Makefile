@@ -23,6 +23,9 @@ restart-mysql:
 connect-admindb:
 	docker compose exec mysql mysql -uroot -proot isuports
 
+connect-tenantdb1:
+	docker compose exec webapp sqlite3 ../tenant_db/1.db
+
 restart-all-container:
 	docker compose down
 	docker compose up --build -d
