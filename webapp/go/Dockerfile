@@ -16,6 +16,8 @@ USER isucon
 
 RUN mkdir -p /home/isucon/webapp/go
 WORKDIR /home/isucon/webapp/go
+COPY --chown=isucon:isucon ./go.mod ./go.sum /home/isucon/webapp/go/
+RUN go mod download -x
 COPY --chown=isucon:isucon ./ /home/isucon/webapp/go/
 
 ENV GOPATH=/home/isucon/tmp/go
