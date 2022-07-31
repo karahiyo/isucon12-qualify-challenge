@@ -22,6 +22,7 @@ services:
       ISUCON_DB_PASSWORD: isucon
       ISUCON_DB_NAME: isuports
       ISUCON_ADMIN_HOSTNAME: admin.t.isucon.dev
+      ISUCON_SQLITE_TRACE_FILE: /tmp/sqlite_trace.log
     ports:
       - "3000:3000"
     links:
