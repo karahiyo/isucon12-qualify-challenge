@@ -5,6 +5,14 @@ bench: cleanlog
 small_bench: cleanlog
 	docker compose exec bench ./bench -duration 10s
 
+
+BENCH_RESULT_DIR := $(CURDIR)/bench_result/$(shell date +"%Y%m%d_%H%M%S")
+run_bench_and_collect_bench_result:
+	$(MAKE) cleanlog
+	docker compose exec bench ./bench | tee $(BENCH_RESULT_DIR)/bench.out
+	$(MAKE) alp > $(BENCH_RESULT_DIR)/alp.out
+	$(MAKE) sqlite-trace > $(BENCH_RESULT_DIR)/sqlite-trace.out
+
 cleanlog:
 	docker compose exec webapp cp /dev/null $(SQLITE_TRACE_LOG)
 	docker compose exec mysql cp /dev/null $(MYSQL_SLOW_LOG)
@@ -33,7 +41,7 @@ SQLITE_TRACE_LOG_LIMIT=10000
 sqlite-trace:
 	docker compose cp webapp:$(SQLITE_TRACE_LOG) $(SQLITE_TRACE_LOG) | \
 		tail -n $(SQLITE_TRACE_LOG_LIMIT) $(SQLITE_TRACE_LOG) | \
-		dsq -s jsonl "SELECT statement, COUNT(1) as cnt, AVG(query_time) as avg, SUM(query_time) as sum FROM {} GROUP BY statement ORDER BY sum DESC" | jq .
+		dsq -s jsonl "SELECT SUBSTRING(statement, 0, 1000) AS statement, COUNT(1) as cnt, AVG(query_time) as avg, SUM(query_time) as sum FROM {} GROUP BY statement ORDER BY sum DESC" | jq .
 
 slow-on:
 	docker compose exec mysql touch $(MYSQL_SLOW_LOG)
