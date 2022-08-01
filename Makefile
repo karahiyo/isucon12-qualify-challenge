@@ -5,7 +5,6 @@ bench: cleanlog
 small_bench: cleanlog
 	docker compose exec bench ./bench -duration 10s
 
-
 BENCH_RESULT_DIR := $(CURDIR)/bench_result/$(shell date +"%Y%m%d_%H%M%S")
 run_bench_and_collect_bench_result:
 	$(MAKE) cleanlog
@@ -25,6 +24,9 @@ __install-tools:
 deploy-webapp:
 	docker compose up -d --no-deps --build webapp
 	docker compose logs webapp -f --tail 10
+
+start_pprof:
+	go tool pprof -seconds 30 -http=0.0.0.0:16060 http://localhost:6060/debug/pprof/profile
 
 connect-admindb:
 	docker compose exec mysql mysql -uroot -proot isuports

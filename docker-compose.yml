@@ -33,6 +33,7 @@ services:
       ISUCON_SQLITE_TRACE_FILE: /tmp/sqlite_trace.log
     ports:
       - "3000:3000"
+      - "6060:6060"
     links:
       - mysql
     volumes:
