@@ -1,9 +1,9 @@
 .PHONY: bench
 bench: cleanlog
-	docker compose run bench ./bench
+	docker compose exec bench ./bench
 
 small_bench: cleanlog
-	docker compose run bench ./bench -duration 10s
+	docker compose exec bench ./bench -duration 10s
 
 cleanlog:
 	docker compose exec webapp cp /dev/null $(SQLITE_TRACE_LOG)

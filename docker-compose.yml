@@ -12,6 +12,14 @@ services:
       - "443:443"
     network_mode: host
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 50M
+        reservations:
+          cpus: '0.50'
+          memory: 50M
 
   webapp:
     build: ./webapp/go
@@ -34,6 +42,14 @@ services:
       - gopkg:/home/isucon/go/pkg
     init: true
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '2'
+          memory: 4G
 
   mysql:
     image: mysql/mysql-server:8.0.29
@@ -78,6 +94,14 @@ services:
       - "bash"
       - "-c"
       - "sleep infinity"
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '4'
+          memory: 8G
 
 volumes:
   mysql:
