@@ -1,0 +1,23 @@
+docker compose logs nginx --tail  --no-log-prefix | \
+		alp ltsv --sort sum --reverse -o count,2xx,3xx,4xx,5xx,method,uri,min,max,sum,avg,p99 -m "/api/player/competition/.+/ranking,/api/admin/tenants/billing,/api/organizer/players/add,/api/player/player/.+,/api/organizer/competition/.+/score,/api/organizer/competition/.+/finish,/api/organizer/player/.+/disqualified,/js,/css,/api/me"
++-------+------+-----+-----+-----+--------+---------------------------------------+--------+--------+----------+--------+--------+
+| COUNT | 2XX  | 3XX | 4XX | 5XX | METHOD |                  URI                  |  MIN   |  MAX   |   SUM    |  AVG   |  P99   |
++-------+------+-----+-----+-----+--------+---------------------------------------+--------+--------+----------+--------+--------+
+| 6358  | 6277 | 0   | 81  | 0   | GET    | /api/player/player/.+                 | 0.002  | 4.819  | 2508.638 | 0.395  | 2.472  |
+| 4193  | 4099 | 0   | 88  | 6   | GET    | /api/player/competition/.+/ranking    | 0.002  | 5.817  | 1970.595 | 0.470  | 2.749  |
+| 5     | 4    | 0   | 1   | 0   | POST   | /initialize                           | 23.329 | 29.836 | 131.623  | 26.325 | 29.836 |
+| 557   | 539  | 0   | 18  | 0   | GET    | /api/player/competitions              | 0.003  | 2.286  | 107.582  | 0.193  | 1.765  |
+| 89    | 86   | 0   | 3   | 0   | GET    | /api/admin/tenants/billing            | 0.003  | 13.205 | 104.645  | 1.176  | 13.205 |
+| 80    | 79   | 0   | 1   | 0   | GET    | /api/organizer/billing                | 0.006  | 6.319  | 67.166   | 0.840  | 6.319  |
+| 152   | 130  | 0   | 22  | 0   | POST   | /api/organizer/competition/.+/score   | 0.003  | 3.428  | 60.460   | 0.398  | 3.211  |
+| 121   | 116  | 0   | 5   | 0   | POST   | /api/organizer/competitions/add       | 0.003  | 1.674  | 24.667   | 0.204  | 1.397  |
+| 100   | 99   | 0   | 1   | 0   | GET    | /api/organizer/players                | 0.004  | 1.686  | 16.717   | 0.167  | 1.600  |
+| 104   | 100  | 0   | 4   | 0   | POST   | /api/organizer/competition/.+/finish  | 0.004  | 1.286  | 16.148   | 0.155  | 1.105  |
+| 40    | 39   | 0   | 1   | 0   | POST   | /api/organizer/players/add            | 0.009  | 1.974  | 8.712    | 0.218  | 1.974  |
+| 45    | 25   | 0   | 20  | 0   | POST   | /api/admin/tenants/add                | 0.002  | 0.304  | 1.960    | 0.044  | 0.304  |
+| 24    | 20   | 0   | 4   | 0   | POST   | /api/organizer/player/.+/disqualified | 0.004  | 0.189  | 1.061    | 0.044  | 0.189  |
+| 2     | 2    | 0   | 0   | 0   | GET    | /api/organizer/competitions           | 0.004  | 0.004  | 0.008    | 0.004  | 0.004  |
+| 4     | 4    | 0   | 0   | 0   | GET    | /css                                  | 0.000  | 0.000  | 0.000    | 0.000  | 0.000  |
+| 4     | 4    | 0   | 0   | 0   | GET    | /js                                   | 0.000  | 0.000  | 0.000    | 0.000  | 0.000  |
+| 4     | 4    | 0   | 0   | 0   | GET    | /index.html                           | 0.000  | 0.000  | 0.000    | 0.000  | 0.000  |
++-------+------+-----+-----+-----+--------+---------------------------------------+--------+--------+----------+--------+--------+
