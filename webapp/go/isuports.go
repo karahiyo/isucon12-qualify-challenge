@@ -50,6 +50,7 @@ var (
 
 	tenantPlayerCache      *cache.Cache
 	tenantCompetitionCache *cache.Cache
+	billingReportCache     *cache.Cache
 )
 
 // 環境変数を取得する、なければデフォルト値を返す
@@ -176,6 +177,7 @@ func Run() {
 
 	initializeTenantPlayerCache(context.Background())
 	initializeTenantCompetitionCache(context.Background())
+	initializeBillingReportCache(context.Background())
 
 	port := getEnv("SERVER_APP_PORT", "3000")
 	e.Logger.Infof("starting isuports server on : %s ...", port)
@@ -352,10 +354,6 @@ type PlayerRow struct {
 	UpdatedAt      int64  `db:"updated_at"`
 }
 
-func getTenantPlayerCacheKey(tenantID int64, playerID string) string {
-	return fmt.Sprintf("/tenant/%d/player/%s", tenantID, playerID)
-}
-
 // 参加者を取得する
 func retrievePlayer(ctx context.Context, tenantDB dbOrTx, id string, tenantID int64) (*PlayerRow, error) {
 	var p PlayerRow
@@ -525,8 +523,8 @@ type VisitHistorySummaryRow struct {
 }
 
 // 大会ごとの課金レポートを計算する
-func billingReportByCompetition(ctx context.Context, tenantDB dbOrTx, tenantID int64, competitonID string) (*BillingReport, error) {
-	comp, err := retrieveCompetition(ctx, tenantDB, competitonID, tenantID)
+func billingReportByCompetition(ctx context.Context, tenantDB dbOrTx, tenantID int64, competitionID string) (*BillingReport, error) {
+	comp, err := retrieveCompetition(ctx, tenantDB, competitionID, tenantID)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieveCompetition: %w", err)
 	}
@@ -541,6 +539,12 @@ func billingReportByCompetition(ctx context.Context, tenantDB dbOrTx, tenantID i
 			BillingVisitorYen: 0,
 			BillingYen:        0,
 		}, nil
+	}
+
+	cacheKey := getBillingReportCacheKey(tenantID, competitionID)
+	cachedBillingReport, found := billingReportCache.Get(cacheKey)
+	if found {
+		return cachedBillingReport.(*BillingReport), nil
 	}
 
 	// ランキングにアクセスした参加者のIDを取得する
@@ -571,7 +575,7 @@ func billingReportByCompetition(ctx context.Context, tenantDB dbOrTx, tenantID i
 		"SELECT DISTINCT(player_id) FROM player_score WHERE tenant_id = ? AND competition_id = ?",
 		tenantID, comp.ID,
 	); err != nil && err != sql.ErrNoRows {
-		return nil, fmt.Errorf("error Select count player_score: tenantID=%d, competitionID=%s, %w", tenantID, competitonID, err)
+		return nil, fmt.Errorf("error Select count player_score: tenantID=%d, competitionID=%s, %w", tenantID, competitionID, err)
 	}
 	for _, pid := range scoredPlayerIDs {
 		// スコアが登録されている参加者
@@ -590,7 +594,7 @@ func billingReportByCompetition(ctx context.Context, tenantDB dbOrTx, tenantID i
 			}
 		}
 	}
-	return &BillingReport{
+	br := &BillingReport{
 		CompetitionID:     comp.ID,
 		CompetitionTitle:  comp.Title,
 		PlayerCount:       playerCount,
@@ -598,7 +602,10 @@ func billingReportByCompetition(ctx context.Context, tenantDB dbOrTx, tenantID i
 		BillingPlayerYen:  100 * playerCount, // スコアを登録した参加者は100円
 		BillingVisitorYen: 10 * visitorCount, // ランキングを閲覧だけした(スコアを登録していない)参加者は10円
 		BillingYen:        100*playerCount + 10*visitorCount,
-	}, nil
+	}
+	billingReportCache.Set(cacheKey, br, 1*time.Minute)
+
+	return br, nil
 }
 
 type TenantWithBilling struct {
@@ -1567,22 +1574,30 @@ func initializeHandler(c echo.Context) error {
 	}
 
 	initializeTenantPlayerCache(context.Background())
+	initializeTenantCompetitionCache(context.Background())
+	initializeBillingReportCache(context.Background())
 
 	return c.JSON(http.StatusOK, SuccessResult{Status: true, Data: res})
 }
 
+func getTenantPlayerCacheKey(tenantID int64, playerID string) string {
+	return fmt.Sprintf("/tenant/%d/player/%s", tenantID, playerID)
+}
 func initializeTenantPlayerCache(ctx context.Context) error {
 	tenantPlayerCache = cache.New(1*time.Minute, 1*time.Minute)
-
 	return nil
 }
-
 func getTenantCompetitionCacheKey(tenantID int64, competitionID string) string {
 	return fmt.Sprintf("/tenant/%d/competition/%s", tenantID, competitionID)
 }
-
 func initializeTenantCompetitionCache(ctx context.Context) error {
 	tenantCompetitionCache = cache.New(1*time.Minute, 1*time.Minute)
-
+	return nil
+}
+func getBillingReportCacheKey(tenantID int64, competitionID string) string {
+	return fmt.Sprintf("/tenant/%d/cempetition/%s", tenantID, competitionID)
+}
+func initializeBillingReportCache(ctx context.Context) error {
+	billingReportCache = cache.New(1*time.Minute, 1*time.Minute)
 	return nil
 }
