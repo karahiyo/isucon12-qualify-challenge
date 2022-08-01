@@ -22,7 +22,7 @@ cp -r ../../initial_data/*.db ../tenant_db/
 
 tenantdbs="../tenant_db/*.db"
 for tenantdb in $tenantdbs; do
-  sqlite3 $tenantdb < ./tenant/01_additional_bootstrap.sql
+  sqlite3 $tenantdb < ./tenant/01_additional_bootstrap.sql &
 done
 
 #for
