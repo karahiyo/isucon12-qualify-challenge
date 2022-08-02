@@ -63,6 +63,14 @@ services:
     ports:
       - 13306:3306
     restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '2'
+          memory: 4G
 
   blackauth:
     build: ./webapp/go

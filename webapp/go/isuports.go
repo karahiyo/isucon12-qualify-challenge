@@ -1185,8 +1185,8 @@ func billingHandler(c echo.Context) error {
 }
 
 type PlayerScoreDetail struct {
-	CompetitionTitle string `json:"competition_title"`
-	Score            int64  `json:"score"`
+	CompetitionTitle string `json:"competition_title" db:"competition_title"`
+	Score            int64  `json:"score" db:"score"`
 }
 
 type PlayerHandlerResult struct {
@@ -1230,15 +1230,19 @@ func playerHandler(c echo.Context) error {
 		return fmt.Errorf("error retrievePlayer: %w", err)
 	}
 
-	pss := []PlayerScoreRow{}
+	psds := []PlayerScoreDetail{}
 	query := `
-SELECT competition_id, score, MAX(row_num) as row_num FROM player_score 
-  WHERE tenant_id = ? AND player_id = ? 
-GROUP BY competition_id
+WITH player_score_per_competition AS (
+ SELECT competition_id, score, MAX(row_num) as row_num
+FROM player_score WHERE tenant_id = ? AND player_id = ? 
+GROUP BY competition_id   
+)
+SELECT competition.title AS competition_title, score AS score
+FROM player_score_per_competition ps JOIN competition ON ps.competition_id = competition.id
 `
 	if err := tenantDB.SelectContext(
 		ctx,
-		&pss,
+		&psds,
 		query,
 		v.tenantID,
 		p.ID,
@@ -1247,18 +1251,6 @@ GROUP BY competition_id
 		if !errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("error Select player_score: tenantID=%d, playerID=%s, %w", v.tenantID, p.ID, err)
 		}
-	}
-
-	psds := make([]PlayerScoreDetail, 0, len(pss))
-	for _, ps := range pss {
-		comp, err := retrieveCompetition(ctx, tenantDB, ps.CompetitionID, v.tenantID)
-		if err != nil {
-			return fmt.Errorf("error retrieveCompetition: %w", err)
-		}
-		psds = append(psds, PlayerScoreDetail{
-			CompetitionTitle: comp.Title,
-			Score:            ps.Score,
-		})
 	}
 
 	res := SuccessResult{
