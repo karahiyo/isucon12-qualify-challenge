@@ -1234,7 +1234,7 @@ func playerHandler(c echo.Context) error {
 	query := `
 SELECT competition_id, score, MAX(row_num) as row_num FROM player_score 
   WHERE tenant_id = ? AND player_id = ? 
-GROUP BY competition_id, score
+GROUP BY competition_id
 `
 	if err := tenantDB.SelectContext(
 		ctx,
