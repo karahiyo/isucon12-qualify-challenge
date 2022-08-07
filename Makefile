@@ -26,7 +26,7 @@ deploy-webapp:
 	docker compose logs webapp -f --tail 10
 
 start_pprof:
-	go tool pprof -seconds 30 -http=0.0.0.0:16060 http://localhost:6060/debug/pprof/profile
+	go tool pprof -seconds 60 -http=0.0.0.0:16060 http://localhost:6060/debug/pprof/profile
 
 connect-admindb:
 	docker compose exec mysql mysql -uroot -proot isuports
