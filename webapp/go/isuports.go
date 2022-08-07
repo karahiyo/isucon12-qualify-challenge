@@ -571,6 +571,9 @@ func getBillingReportByCompetition(ctx context.Context, tenantDB dbOrTx, tenantI
 		`SELECT * FROM billing_report WHERE competition_id = ?`,
 		comp.ID,
 	); err != nil {
+		if err == sql.ErrNoRows {
+			return &BillingReport{CompetitionID: comp.ID, CompetitionTitle: comp.Title}, nil
+		}
 		return nil, fmt.Errorf("error Select billing_report: competitionID=%s, %w", comp.ID, err)
 	}
 
@@ -1041,12 +1044,10 @@ func competitionFinishHandler(c echo.Context) error {
 	tenantCompetitionCache.Set(getTenantCompetitionCacheKey(v.tenantID, id), *comp, 1*time.Minute)
 
 	// billing reportの計算を行う
-	go func() {
-		err = createBillingReportByCompetition(ctx, tenantDB, v.tenantID, comp.ID)
-		if err != nil {
-			c.Logger().Errorf("failed to calcBillingReportByCompetition: %w", err)
-		}
-	}()
+	err = createBillingReportByCompetition(ctx, tenantDB, v.tenantID, comp.ID)
+	if err != nil {
+		c.Logger().Errorf("failed to calcBillingReportByCompetition: %w", err)
+	}
 
 	return c.JSON(http.StatusOK, SuccessResult{Status: true})
 }
