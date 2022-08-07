@@ -478,9 +478,6 @@ func tenantsAddHandler(c echo.Context) error {
 	if err != nil {
 		return fmt.Errorf("error get LastInsertId: %w", err)
 	}
-	// NOTE: 先にadminDBに書き込まれることでこのAPIの処理中に
-	//       /api/admin/tenants/billingにアクセスされるとエラーになりそう
-	//       ロックなどで対処したほうが良さそう
 	if err := createTenantDB(id); err != nil {
 		return fmt.Errorf("error createTenantDB: id=%d name=%s %w", id, name, err)
 	}
@@ -951,6 +948,7 @@ func competitionsAddHandler(c echo.Context) error {
 // テナント管理者向けAPI
 // POST /api/organizer/competition/:competition_id/finish
 // 大会を終了する
+// 終了と同時にbilling reportの計算を行う
 func competitionFinishHandler(c echo.Context) error {
 	ctx := context.Background()
 	v, err := parseViewer(c)
@@ -994,6 +992,14 @@ func competitionFinishHandler(c echo.Context) error {
 	comp.FinishedAt = sql.NullInt64{Valid: true, Int64: now}
 	comp.UpdatedAt = now
 	tenantCompetitionCache.Set(getTenantCompetitionCacheKey(v.tenantID, id), *comp, 1*time.Minute)
+
+	// billing reportの計算を行う
+	go func() {
+		_, err := billingReportByCompetition(ctx, tenantDB, v.tenantID, comp.ID)
+		if err != nil {
+			c.Logger().Errorf("failed to billingReportByCompetition: %w", err)
+		}
+	}()
 
 	return c.JSON(http.StatusOK, SuccessResult{Status: true})
 }
@@ -1233,9 +1239,9 @@ func playerHandler(c echo.Context) error {
 	psds := []PlayerScoreDetail{}
 	query := `
 WITH player_score_per_competition AS (
- SELECT competition_id, score, MAX(row_num) as row_num
-FROM player_score WHERE tenant_id = ? AND player_id = ? 
-GROUP BY competition_id   
+  SELECT competition_id, score, MAX(row_num) as row_num
+  FROM player_score WHERE tenant_id = ? AND player_id = ? 
+  GROUP BY competition_id   
 )
 SELECT competition.title AS competition_title, score AS score
 FROM player_score_per_competition ps JOIN competition ON ps.competition_id = competition.id
