@@ -1035,18 +1035,18 @@ func competitionFinishHandler(c echo.Context) error {
 			now, now, id, err,
 		)
 	}
-	//// キャッシュ更新
-	//comp.FinishedAt = sql.NullInt64{Valid: true, Int64: now}
-	//comp.UpdatedAt = now
-	//tenantCompetitionCache.Set(getTenantCompetitionCacheKey(v.tenantID, id), *comp, 1*time.Minute)
+	// キャッシュ更新
+	comp.FinishedAt = sql.NullInt64{Valid: true, Int64: now}
+	comp.UpdatedAt = now
+	tenantCompetitionCache.Set(getTenantCompetitionCacheKey(v.tenantID, id), *comp, 1*time.Minute)
 
 	// billing reportの計算を行う
-	//go func() {
-	err = createBillingReportByCompetition(ctx, tenantDB, v.tenantID, comp.ID)
-	if err != nil {
-		c.Logger().Errorf("failed to calcBillingReportByCompetition: %w", err)
-	}
-	//}()
+	go func() {
+		err = createBillingReportByCompetition(ctx, tenantDB, v.tenantID, comp.ID)
+		if err != nil {
+			c.Logger().Errorf("failed to calcBillingReportByCompetition: %w", err)
+		}
+	}()
 
 	return c.JSON(http.StatusOK, SuccessResult{Status: true})
 }
