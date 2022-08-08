@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/patrickmn/go-cache"
+	"golang.org/x/sync/errgroup"
 	"io"
 	"net/http"
 	_ "net/http/pprof"
@@ -18,7 +19,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
@@ -32,9 +32,10 @@ import (
 )
 
 const (
-	tenantDBSchemaFilePath = "../sql/tenant/10_schema.sql"
-	initializeScript       = "../sql/init.sh"
-	cookieName             = "isuports_session"
+	tenantDBSchemaFilePath   = "../sql/tenant/10_schema.sql"
+	initializeScript         = "../sql/init.sh"
+	initializeTenantDBScript = "../sql/init_tenantdb.sh"
+	cookieName               = "isuports_session"
 
 	RoleAdmin     = "admin"
 	RoleOrganizer = "organizer"
@@ -43,6 +44,8 @@ const (
 )
 
 var (
+	webAppHosts = []string{"webapp1:3000", "webapp2:3002"}
+
 	// 正しいテナント名の正規表現
 	tenantNameRegexp = regexp.MustCompile(`^[a-z][a-z0-9-]{0,61}[a-z0-9]$`)
 
@@ -169,6 +172,7 @@ func Run() {
 
 	// ベンチマーカー向けAPI
 	e.POST("/initialize", initializeHandler)
+	e.POST("/initialize_sub", initializeSubHandler)
 
 	e.HTTPErrorHandler = errorResponseHandler
 
@@ -1629,15 +1633,56 @@ func initializeHandler(c echo.Context) error {
 	initializeTenantPlayerCache(context.Background())
 	initializeTenantCompetitionCache(context.Background())
 
-	c.Logger().Infof("start initialize billing report")
-	ctx := context.Background()
-	wg := sync.WaitGroup{}
-	for i := 1; i <= 100; i++ {
-		wg.Add(1)
-		err := func() error {
-			defer wg.Done()
+	eg, _ := errgroup.WithContext(context.Background())
+	for _, host := range webAppHosts {
+		host := host
+		eg.Go(func() error {
+			_, err := http.Post(fmt.Sprintf("http://%s/initialize_sub", host), "application/json", nil)
+			if err != nil {
+				return fmt.Errorf("failed to http.Post /initialize_sub : %w", err)
+			}
+			return nil
+		})
+	}
+	if err := eg.Wait(); err != nil {
+		return fmt.Errorf("failed to http /initialize_sub request: %w", err)
+	}
 
-			tenantID := int64(i)
+	res := InitializeHandlerResult{
+		Lang: "go",
+	}
+
+	return c.JSON(http.StatusOK, SuccessResult{Status: true, Data: res})
+}
+
+func initializeSubHandler(c echo.Context) error {
+	ctx := context.Background()
+	c.Logger().Infof("start initializeTenantDBScript script")
+	out, err := exec.Command(initializeTenantDBScript).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("error exec.Command: %s %e", string(out), err)
+	}
+	c.Logger().Infof("finish initializeTenantDBScript script")
+
+	initializeTenantPlayerCache(context.Background())
+	initializeTenantCompetitionCache(context.Background())
+
+	c.Logger().Infof("start initialize billing report")
+	err = initializeAllBillingReports(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to initializeAllBillingReports: %w", err)
+	}
+	c.Logger().Infof("finish initialize billing report")
+
+	return c.NoContent(http.StatusOK)
+}
+
+func initializeAllBillingReports(ctx context.Context) error {
+	eg, ctx := errgroup.WithContext(ctx)
+
+	for i := 1; i <= 100; i++ {
+		tenantID := int64(i)
+		eg.Go(func() error {
 			tenantDB, err := connectToTenantDB(tenantID)
 			if err != nil {
 				return fmt.Errorf("failed to connectToTenantDB: %w", err)
@@ -1662,19 +1707,13 @@ func initializeHandler(c echo.Context) error {
 			}
 
 			return nil
-		}()
-		if err != nil {
-			return fmt.Errorf("failed to initialize tenantdb: %w", err)
-		}
-	}
-	wg.Wait()
-	c.Logger().Infof("finish initialize billing report")
-
-	res := InitializeHandlerResult{
-		Lang: "go",
+		})
 	}
 
-	return c.JSON(http.StatusOK, SuccessResult{Status: true, Data: res})
+	if err := eg.Wait(); err != nil {
+		return fmt.Errorf("failed to initialize tenantdb: %w", err)
+	}
+	return nil
 }
 
 func getTenantPlayerCacheKey(tenantID int64, playerID string) string {
