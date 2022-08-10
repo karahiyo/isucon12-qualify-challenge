@@ -1409,26 +1409,16 @@ func competitionRankingHandler(c echo.Context) error {
 
 	// TODO: admindb.competition_rank tableから取得する
 	ranks := make([]CompetitionRank, 0, 100)
-	if err := tenantDB.SelectContext(
+	if err := adminDB.SelectContext(
 		ctx,
 		&ranks,
 		`
-SELECT 
-       ROW_NUMBER() OVER(ORDER BY ps.score DESC, ps.row_num ASC) as rank, 
-       ps.score AS score, 
-       ps.player_id as player_id,
-       p.display_name AS player_display_name
-FROM (
-    SELECT player_id, score, MAX(row_num) as row_num
-    FROM player_score
-	WHERE tenant_id = ? AND competition_id = ? 
-	GROUP BY player_id
-) ps 
-JOIN player p ON p.id = ps.player_id
+SELECT *
+FROM competition_rank
+WHERE competition_id = ? 
 ORDER BY rank
 LIMIT 100 OFFSET ?
 `,
-		v.tenantID,
 		competitionID,
 		rankAfter,
 	); err != nil {
