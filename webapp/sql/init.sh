@@ -31,9 +31,4 @@ rm -f ../tenant_db/*.db
 cp -r ../../initial_data/*.db ../tenant_db/
 
 # 事前にupdate_tenantdb_initial_data.shで実行する。ここでのupdateはしない
-#
-#tenantdbs="../tenant_db/*.db"
-#for tenantdb in $tenantdbs; do
-#  sqlite3 $tenantdb < ./tenant/01_additional_bootstrap.sql &
-#done
-#wait
+# sh ./update_tenantdb_initial_data.sh

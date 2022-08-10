@@ -3,11 +3,10 @@
 set -ex
 cd `dirname $0`
 
-mkdir -p ../../initial_data/backup/
-cp -r ../../initial_data/*.db ../../initial_data/backup/
-
 tenantdbs="../../initial_data/*.db"
 for tenantdb in $tenantdbs; do
+  echo "running... sqlite3 $tenantdb < ./tenant/01_additional_bootstrap.sql"
   sqlite3 $tenantdb < ./tenant/01_additional_bootstrap.sql &
+  echo "finish! tenantdb: $tenantdb"
 done
 wait
