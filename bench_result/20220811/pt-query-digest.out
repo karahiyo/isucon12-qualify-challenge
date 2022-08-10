@@ -1,0 +1,116 @@
+docker compose cp mysql:/tmp/mysql-slow.log /tmp/mysql-slow.log | pt-query-digest /tmp/mysql-slow.log
+
+# 1s user time, 50ms system time, 32.72M rss, 33.52G vsz
+# Current date: Thu Aug 11 01:13:46 2022
+# Hostname: CA-20014547
+# Files: /tmp/mysql-slow.log
+# Overall: 8.04k total, 12 unique, 92.43 QPS, 1.02x concurrency __________
+# Time range: 2022-08-10T16:10:20 to 2022-08-10T16:11:47
+# Attribute          total     min     max     avg     95%  stddev  median
+# ============     ======= ======= ======= ======= ======= ======= =======
+# Exec time            89s     1ms     21s    11ms    17ms   228ms     6ms
+# Lock time          285ms       0    35ms    35us    76us   411us    16us
+# Rows sent         44.59k       0   4.82k    5.68       0  149.24       0
+# Rows examine       3.31M       0   3.08M  431.88       0  34.64k       0
+# Query size         2.04M      26     418  266.42  346.17   46.73  246.02
+
+# Profile
+# Rank Query ID                            Response time Calls R/Call  V/M
+# ==== =================================== ============= ===== ======= ===
+#    1 0x62A563610AB68DFED2717953509B2464  58.6800 66.2%  6566  0.0089  0.01 INSERT UPDATE visit_history?
+#    2 0x3289E87E94D5A82E348974B3D332E575  20.5220 23.2%     1 20.5220  0.00 DELETE visit_history
+#    3 0x5112E904A11BC727FD027416E7A7D957   8.8055  9.9%  1344  0.0066  0.00 INSERT UPDATE billing_report
+# MISC 0xMISC                               0.6163  0.7%   130  0.0047   0.0 <9 ITEMS>
+
+# Query 1: 102.59 QPS, 0.92x concurrency, ID 0x62A563610AB68DFED2717953509B2464 at byte 2650696
+# This item is included in the report because it matches --limit.
+# Scores: V/M = 0.01
+# Time range: 2022-08-10T16:10:43 to 2022-08-10T16:11:47
+# Attribute    pct   total     min     max     avg     95%  stddev  median
+# ============ === ======= ======= ======= ======= ======= ======= =======
+# Count         81    6566
+# Exec time     66     59s     1ms   134ms     9ms    22ms    11ms     6ms
+# Lock time     75   214ms    10us     8ms    32us    80us   171us    17us
+# Rows sent      0       0       0       0       0       0       0       0
+# Rows examine   0       0       0       0       0       0       0       0
+# Query size    77   1.58M     198     255  252.49  246.02    6.76  246.02
+# String:
+# Hosts        172.21.0.4
+# Users        isucon
+# Query_time distribution
+#   1us
+#  10us
+# 100us
+#   1ms  ################################################################
+#  10ms  ##########
+# 100ms  #
+#    1s
+#  10s+
+# Tables
+#    SHOW TABLE STATUS LIKE 'visit_history2'\G
+#    SHOW CREATE TABLE `visit_history2`\G
+INSERT INTO visit_history2 (player_id, tenant_id, competition_id, created_at, updated_at)
+	VALUES ('ab79585b-3260-4f33-9a18-6231e95ea4ff', 174, '8d25bd06-9f83-41ee-bdaf-5cf0f122d863', 1660147886, 1660147886) ON DUPLICATE KEY UPDATE updated_at = 1660147886\G
+
+# Query 2: 0 QPS, 0x concurrency, ID 0x3289E87E94D5A82E348974B3D332E575 at byte 229
+# This item is included in the report because it matches --limit.
+# Scores: V/M = 0.00
+# Time range: all events occurred at 2022-08-10T16:10:40
+# Attribute    pct   total     min     max     avg     95%  stddev  median
+# ============ === ======= ======= ======= ======= ======= ======= =======
+# Count          0       1
+# Exec time     23     21s     21s     21s     21s     21s       0     21s
+# Lock time      0    14us    14us    14us    14us    14us       0    14us
+# Rows sent      0       0       0       0       0       0       0       0
+# Rows examine  92   3.08M   3.08M   3.08M   3.08M   3.08M       0   3.08M
+# Query size     0      58      58      58      58      58       0      58
+# String:
+# Hosts        172.21.0.4
+# Users        isucon
+# Query_time distribution
+#   1us
+#  10us
+# 100us
+#   1ms
+#  10ms
+# 100ms
+#    1s
+#  10s+  ################################################################
+# Tables
+#    SHOW TABLE STATUS LIKE 'visit_history'\G
+#    SHOW CREATE TABLE `visit_history`\G
+DELETE FROM visit_history WHERE created_at >= '1654041600'\G
+# Converted for EXPLAIN
+# EXPLAIN /*!50100 PARTITIONS*/
+select * from  visit_history WHERE created_at >= '1654041600'\G
+
+# Query 3: 20.36 QPS, 0.13x concurrency, ID 0x5112E904A11BC727FD027416E7A7D957 at byte 1283676
+# This item is included in the report because it matches --limit.
+# Scores: V/M = 0.00
+# Time range: 2022-08-10T16:10:41 to 2022-08-10T16:11:47
+# Attribute    pct   total     min     max     avg     95%  stddev  median
+# ============ === ======= ======= ======= ======= ======= ======= =======
+# Count         16    1344
+# Exec time      9      9s     2ms    83ms     7ms    11ms     4ms     6ms
+# Lock time     11    32ms    10us   286us    23us    54us    21us    15us
+# Rows sent      0       0       0       0       0       0       0       0
+# Rows examine   0       0       0       0       0       0       0       0
+# Query size    22 464.86k     320     418  354.18  381.65   18.41  346.17
+# String:
+# Hosts        172.21.0.4
+# Users        isucon
+# Query_time distribution
+#   1us
+#  10us
+# 100us
+#   1ms  ################################################################
+#  10ms  ######
+# 100ms
+#    1s
+#  10s+
+# Tables
+#    SHOW TABLE STATUS LIKE 'billing_report'\G
+#    SHOW CREATE TABLE `billing_report`\G
+INSERT INTO billing_report (competition_id, competition_title, player_count, visitor_count, billing_player_yen, billing_visitor_yen, billing_yen)
+VALUES ('88e99895-2b01-4248-badc-246c3ed45363', '丸腰チャーシュー乃月大会', 234, 0, 23400, 0, 23400)
+ON DUPLICATE KEY UPDATE player_count = 234, visitor_count = 0, billing_player_yen = 23400, billing_visitor_yen = 0, billing_yen = 23400\G

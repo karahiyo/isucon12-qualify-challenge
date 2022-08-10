@@ -1,0 +1,23 @@
+docker compose logs nginx --tail  --no-log-prefix | \
+		alp ltsv --sort sum --reverse -o count,2xx,3xx,4xx,5xx,method,uri,min,max,sum,avg,p99 -m "/api/player/competition/.+/ranking,/api/admin/tenants/billing,/api/organizer/players/add,/api/player/player/.+,/api/organizer/competition/.+/score,/api/organizer/competition/.+/finish,/api/organizer/player/.+/disqualified,/js,/css,/api/me"
++-------+-------+-----+-----+-----+--------+---------------------------------------+-------+--------+----------+--------+--------+
+| COUNT |  2XX  | 3XX | 4XX | 5XX | METHOD |                  URI                  |  MIN  |  MAX   |   SUM    |  AVG   |  P99   |
++-------+-------+-----+-----+-----+--------+---------------------------------------+-------+--------+----------+--------+--------+
+| 13085 | 12819 | 0   | 266 | 0   | GET    | /api/player/competition/.+/ranking    | 0.002 | 8.671  | 4352.170 | 0.333  | 3.318  |
+| 18873 | 18647 | 0   | 226 | 0   | GET    | /api/player/player/.+                 | 0.001 | 2.221  | 3675.185 | 0.195  | 0.988  |
+| 23    | 6     | 0   | 4   | 13  | POST   | /initialize                           | 2.113 | 30.020 | 379.480  | 16.499 | 30.020 |
+| 1908  | 1862  | 0   | 46  | 0   | GET    | /api/player/competitions              | 0.001 | 1.361  | 160.656  | 0.084  | 0.662  |
+| 254   | 248   | 0   | 6   | 0   | GET    | /api/organizer/billing                | 0.002 | 10.200 | 153.733  | 0.605  | 9.499  |
+| 493   | 486   | 0   | 7   | 0   | GET    | /api/admin/tenants/billing            | 0.002 | 20.961 | 134.011  | 0.272  | 5.705  |
+| 418   | 378   | 0   | 40  | 0   | POST   | /api/organizer/competition/.+/score   | 0.002 | 3.728  | 115.942  | 0.277  | 2.745  |
+| 307   | 297   | 0   | 10  | 0   | POST   | /api/organizer/competition/.+/finish  | 0.003 | 8.291  | 83.349   | 0.271  | 3.681  |
+| 357   | 350   | 0   | 7   | 0   | POST   | /api/organizer/competitions/add       | 0.002 | 1.024  | 25.829   | 0.072  | 0.775  |
+| 320   | 319   | 0   | 1   | 0   | GET    | /api/organizer/players                | 0.002 | 1.612  | 24.684   | 0.077  | 0.775  |
+| 113   | 111   | 0   | 2   | 0   | POST   | /api/organizer/players/add            | 0.008 | 1.170  | 9.193    | 0.081  | 0.499  |
+| 101   | 71    | 0   | 30  | 0   | POST   | /api/admin/tenants/add                | 0.001 | 0.321  | 4.952    | 0.049  | 0.296  |
+| 44    | 38    | 0   | 6   | 0   | POST   | /api/organizer/player/.+/disqualified | 0.004 | 0.716  | 2.223    | 0.051  | 0.716  |
+| 6     | 6     | 0   | 0   | 0   | GET    | /api/organizer/competitions           | 0.002 | 0.004  | 0.016    | 0.003  | 0.004  |
+| 6     | 6     | 0   | 0   | 0   | GET    | /css                                  | 0.000 | 0.000  | 0.000    | 0.000  | 0.000  |
+| 6     | 6     | 0   | 0   | 0   | GET    | /js                                   | 0.000 | 0.000  | 0.000    | 0.000  | 0.000  |
+| 6     | 6     | 0   | 0   | 0   | GET    | /index.html                           | 0.000 | 0.000  | 0.000    | 0.000  | 0.000  |
++-------+-------+-----+-----+-----+--------+---------------------------------------+-------+--------+----------+--------+--------+

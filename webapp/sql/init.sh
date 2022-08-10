@@ -19,12 +19,13 @@ mysql -u"$ISUCON_DB_USER" \
 		"$ISUCON_DB_NAME" < init.sql
 
 # visit_hository2のrestore
-# mysqldump -u"$ISUCON_DB_ROOT_USER" -p"$ISUCON_DB_ROOT_PASSWORD" --host "$ISUCON_DB_HOST" --port "$ISUCON_DB_PORT" "$ISUCON_DB_NAME" visit_history2 --no-create-info --single-transaction > ../../initial_data/visit_history2.dump
-mysql -u"$ISUCON_DB_USER" \
-		-p"$ISUCON_DB_PASSWORD" \
-		--host "$ISUCON_DB_HOST" \
-		--port "$ISUCON_DB_PORT" \
-		"$ISUCON_DB_NAME" < ../../initial_data/visit_history2.dump
+# mysqldump -u"$ISUCON_DB_ROOT_USER" -p"$ISUCON_DB_ROOT_PASSWORD" --host "$ISUCON_DB_HOST" --port "$ISUCON_DB_PORT" "$ISUCON_DB_NAME" visit_history2 --no-create-info --single-transaction --set-gtid-purged=OFF > ../../initial_data/visit_history2.dump
+#
+#mysqlimport -u"$ISUCON_DB_ROOT_USER" \
+#		-p"$ISUCON_DB_ROOT_PASSWORD" \
+#		--host "$ISUCON_DB_HOST" \
+#		--port "$ISUCON_DB_PORT" \
+#		"$ISUCON_DB_NAME" ../../initial_data/visit_history2.dump
 
 # SQLiteのデータベースを初期化
 rm -f ../tenant_db/*.db
