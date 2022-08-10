@@ -50,6 +50,7 @@ var (
 
 	sqliteDriverName = "sqlite3"
 
+	tenantCache            *cache.Cache
 	tenantPlayerCache      *cache.Cache
 	tenantCompetitionCache *cache.Cache
 )
@@ -180,6 +181,7 @@ func Run() {
 	adminDB.SetMaxOpenConns(10)
 	defer adminDB.Close()
 
+	initializeTenantCache()
 	initializeTenantPlayerCache(context.Background())
 	initializeTenantCompetitionCache(context.Background())
 
@@ -324,13 +326,20 @@ func retrieveTenantRowFromHeader(c echo.Context) (*TenantRow, error) {
 
 	// テナントの存在確認
 	var tenant TenantRow
-	if err := adminDB.GetContext(
-		context.Background(),
-		&tenant,
-		"SELECT * FROM tenant WHERE name = ?",
-		tenantName,
-	); err != nil {
-		return nil, fmt.Errorf("failed to Select tenant: name=%s, %w", tenantName, err)
+	cacheKey := getTenantCacheKey(tenantName)
+	cachedTenant, found := tenantCache.Get(cacheKey)
+	if found {
+		tenant = cachedTenant.(TenantRow)
+	} else {
+		if err := adminDB.GetContext(
+			context.Background(),
+			&tenant,
+			"SELECT * FROM tenant WHERE name = ?",
+			tenantName,
+		); err != nil {
+			return nil, fmt.Errorf("failed to Select tenant: name=%s, %w", tenantName, err)
+		}
+		tenantCache.Set(cacheKey, tenant, 1*time.Minute)
 	}
 	return &tenant, nil
 }
@@ -1374,20 +1383,15 @@ func competitionRankingHandler(c echo.Context) error {
 	}
 
 	now := time.Now().Unix()
-	var tenant TenantRow
-	if err := adminDB.GetContext(ctx, &tenant, "SELECT * FROM tenant WHERE id = ?", v.tenantID); err != nil {
-		return fmt.Errorf("error Select tenant: id=%d, %w", v.tenantID, err)
-	}
-
 	if _, err := adminDB.ExecContext(
 		ctx,
 		`INSERT INTO visit_history2 (player_id, tenant_id, competition_id, created_at, updated_at)
 	VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE updated_at = ?;`,
-		v.playerID, tenant.ID, competitionID, now, now, now,
+		v.playerID, v.tenantID, competitionID, now, now, now,
 	); err != nil {
 		return fmt.Errorf(
 			"error Insert visit_history2: playerID=%s, tenantID=%d, competitionID=%s, createdAt=%d, updatedAt=%d, %w",
-			v.playerID, tenant.ID, competitionID, now, now, err,
+			v.playerID, v.tenantID, competitionID, now, now, err,
 		)
 	}
 
@@ -1419,11 +1423,11 @@ JOIN player p ON p.id = ps.player_id
 ORDER BY rank
 LIMIT 100 OFFSET ?
 `,
-		tenant.ID,
+		v.tenantID,
 		competitionID,
 		rankAfter,
 	); err != nil {
-		return fmt.Errorf("error Select rank: tenantID=%d, competitionID=%s, rankAfter=%d, %w", tenant.ID, competitionID, rankAfter, err)
+		return fmt.Errorf("error Select rank: tenantID=%d, competitionID=%s, rankAfter=%d, %w", v.tenantID, competitionID, rankAfter, err)
 	}
 
 	res := SuccessResult{
@@ -1626,6 +1630,7 @@ func initializeHandler(c echo.Context) error {
 	}
 	c.Logger().Infof("finish initialize script")
 
+	initializeTenantCache()
 	initializeTenantPlayerCache(context.Background())
 	initializeTenantCompetitionCache(context.Background())
 
@@ -1672,6 +1677,13 @@ func initializeHandler(c echo.Context) error {
 	return c.JSON(http.StatusOK, SuccessResult{Status: true, Data: res})
 }
 
+func getTenantCacheKey(name string) string {
+	return fmt.Sprintf("/tenant/%s", name)
+}
+func initializeTenantCache() error {
+	tenantCache = cache.New(1*time.Minute, 1*time.Minute)
+	return nil
+}
 func getTenantPlayerCacheKey(tenantID int64, playerID string) string {
 	return fmt.Sprintf("/tenant/%d/player/%s", tenantID, playerID)
 }
