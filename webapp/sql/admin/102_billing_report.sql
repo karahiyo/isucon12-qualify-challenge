@@ -8,6 +8,7 @@
 -- 	BillingYen        int64  `json:"billing_yen"`         // 合計請求金額
 -- }
 
+DROP TABLE billing_report;
 CREATE TABLE billing_report
 (
     competition_id VARCHAR(255) NOT NULL,
