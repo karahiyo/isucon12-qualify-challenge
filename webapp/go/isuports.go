@@ -1407,18 +1407,11 @@ func competitionRankingHandler(c echo.Context) error {
 		}
 	}
 
-	// TODO: admindb.competition_rank tableから取得する
 	ranks := make([]CompetitionRank, 0, 100)
 	if err := adminDB.SelectContext(
 		ctx,
 		&ranks,
-		`
-SELECT *
-FROM competition_rank
-WHERE competition_id = ? 
-ORDER BY rank
-LIMIT 100 OFFSET ?
-`,
+		"SELECT * FROM competition_rank WHERE competition_id = ? ORDER BY `rank` LIMIT 100 OFFSET ?",
 		competitionID,
 		rankAfter,
 	); err != nil {
