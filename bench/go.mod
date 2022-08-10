@@ -3,7 +3,6 @@ module github.com/isucon/isucon12-qualify/bench
 go 1.18
 
 require (
-	github.com/Songmu/go-httpdate v1.0.0
 	github.com/google/go-cmp v0.5.8
 	github.com/isucon/isucandar v0.0.0-20220322062028-6dd56dc57d72
 	github.com/isucon/isucon12-portal v0.0.0-00010101000000-000000000000
@@ -11,17 +10,18 @@ require (
 	github.com/isucon/isucon12-qualify/webapp/go v0.0.0-00010101000000-000000000000
 	github.com/k0kubun/pp/v3 v3.1.0
 	github.com/lestrrat-go/jwx/v2 v2.0.2
-	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
+	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
 )
 
 require (
+	github.com/Songmu/go-httpdate v1.0.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/dsnet/compress v0.0.1 // indirect
 	github.com/go-sql-driver/mysql v1.6.0 // indirect
 	github.com/goccy/go-json v0.9.7 // indirect
+	github.com/gofrs/flock v0.8.1 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/google/uuid v1.3.0 // indirect
 	github.com/jaswdr/faker v1.10.2 // indirect
 	github.com/jmoiron/sqlx v1.3.5 // indirect
 	github.com/labstack/echo/v4 v4.7.2 // indirect
@@ -34,7 +34,6 @@ require (
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/mattn/go-sqlite3 v1.14.13 // indirect
-	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
 	github.com/pquerna/cachecontrol v0.1.0 // indirect
 	github.com/samber/lo v1.21.0 // indirect
 	github.com/shogo82148/go-sql-proxy v0.6.1 // indirect

@@ -21,7 +21,7 @@ services:
           cpus: '0.50'
           memory: 50M
 
-  webapp1:
+  webapp:
     build: ./webapp/go
     environment:
       ISUCON_DB_HOST: mysql
@@ -34,37 +34,6 @@ services:
     ports:
       - "3000:3000"
       - "6060:6060"
-    links:
-      - mysql
-    volumes:
-      - ./webapp:/home/isucon/webapp
-      - tenant_db:/home/isucon/webapp/tenant_db
-      - initial_data:/home/isucon/initial_data
-      - gopkg:/home/isucon/go/pkg
-    init: true
-    restart: always
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 4G
-        reservations:
-          cpus: '2'
-          memory: 4G
-
-  webapp2:
-    build: ./webapp/go
-    environment:
-      ISUCON_DB_HOST: mysql
-      ISUCON_DB_PORT: 3306
-      ISUCON_DB_USER: isucon
-      ISUCON_DB_PASSWORD: isucon
-      ISUCON_DB_NAME: isuports
-      ISUCON_ADMIN_HOSTNAME: admin.t.isucon.dev
-      ISUCON_SQLITE_TRACE_FILE: /tmp/sqlite_trace.log
-      SERVER_APP_PORT: 3002
-    ports:
-      - "3002:3002"
     links:
       - mysql
     volumes:

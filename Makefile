@@ -25,14 +25,6 @@ deploy-webapp:
 	docker compose up -d --no-deps --build webapp
 	docker compose logs webapp -f --tail 10
 
-deploy-webapp1:
-	docker compose up -d --no-deps --build webapp1
-	docker compose logs webapp1 -f --tail 10
-
-deploy-webapp2:
-	docker compose up -d --no-deps --build webapp2
-	docker compose logs webapp2 -f --tail 10
-
 start_pprof:
 	go tool pprof -seconds 60 -http=0.0.0.0:16060 http://localhost:6060/debug/pprof/profile
 
