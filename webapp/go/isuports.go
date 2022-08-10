@@ -1124,6 +1124,7 @@ func competitionScoreHandler(c echo.Context) error {
 	}
 
 	var rowNum int64
+	// TODO: ユーザごとに1レコードのみに絞る
 	playerScoreRows := []PlayerScoreRow{}
 	for {
 		rowNum++
@@ -1173,9 +1174,6 @@ func competitionScoreHandler(c echo.Context) error {
 	}
 
 	tx := tenantDB.MustBeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("error tenantDB.BeginTx: tenantID=%d, %w", v.tenantID, err)
-	}
 	if _, err := tx.ExecContext(ctx,
 		"DELETE FROM player_score WHERE tenant_id = ? AND competition_id = ?",
 		v.tenantID,
@@ -1190,6 +1188,11 @@ func competitionScoreHandler(c echo.Context) error {
 		); err != nil {
 			return fmt.Errorf("error bulk insert player_score: %w", err)
 		}
+	}
+
+	err = recreateCompetitionRank(ctx, tx, v.tenantID, competitionID)
+	if err != nil {
+		return fmt.Errorf("error recreateCompetitionRank: tenantID:%d, competitionID:%s, err:%w", v.tenantID, competitionID, err)
 	}
 	tx.Commit()
 
@@ -1333,6 +1336,7 @@ FROM player_score_per_competition ps JOIN competition ON ps.competition_id = com
 }
 
 type CompetitionRank struct {
+	CompetitionID     string `json:"-" db:"competition_id"`
 	Rank              int64  `json:"rank" db:"rank"`
 	Score             int64  `json:"score" db:"score"`
 	PlayerID          string `json:"player_id" db:"player_id"`
@@ -1403,6 +1407,7 @@ func competitionRankingHandler(c echo.Context) error {
 		}
 	}
 
+	// TODO: admindb.competition_rank tableから取得する
 	ranks := make([]CompetitionRank, 0, 100)
 	if err := tenantDB.SelectContext(
 		ctx,
@@ -1442,6 +1447,52 @@ LIMIT 100 OFFSET ?
 		},
 	}
 	return c.JSON(http.StatusOK, res)
+}
+
+func recreateCompetitionRank(ctx context.Context, tx *sqlx.Tx, tenantID int64, competitionID string) error {
+	ranks := make([]CompetitionRank, 0, 100)
+	if err := tx.SelectContext(
+		ctx,
+		&ranks,
+		`
+SELECT 
+       ps.competition_id,
+       ROW_NUMBER() OVER(ORDER BY ps.score DESC, ps.row_num ASC) as rank, 
+       ps.score AS score, 
+       ps.player_id as player_id,
+       p.display_name AS player_display_name
+FROM (
+    SELECT competition_id, player_id, score, MAX(row_num) as row_num
+    FROM player_score
+	WHERE tenant_id = ? AND competition_id = ? 
+	GROUP BY player_id
+) ps 
+JOIN player p ON p.id = ps.player_id
+`,
+		tenantID,
+		competitionID,
+	); err != nil {
+		return fmt.Errorf("error Select rank: tenantID=%d, competitionID=%s, rankAfter=%d, %w", tenantID, competitionID, err)
+	}
+
+	adminTx := adminDB.MustBeginTx(ctx, nil)
+	if _, err := adminTx.ExecContext(ctx,
+		"DELETE FROM competition_rank WHERE competition_id = ?",
+		competitionID,
+	); err != nil {
+		return fmt.Errorf("error Delete competition_rank: competitionID=%s, %w", competitionID, err)
+	}
+
+	if _, err := adminTx.NamedExecContext(
+		ctx,
+		"INSERT INTO competition_rank(`competition_id`, `rank`, `score`, `player_id`, `player_display_name`) VALUES (:competition_id, :rank, :score, :player_id, :player_display_name)",
+		ranks,
+	); err != nil {
+		return fmt.Errorf("error bulk insert into competition_rank: competitionID=%s, %w", competitionID, err)
+	}
+	adminTx.Commit()
+
+	return nil
 }
 
 type CompetitionsHandlerResult struct {
