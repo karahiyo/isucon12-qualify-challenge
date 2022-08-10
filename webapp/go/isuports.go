@@ -50,9 +50,10 @@ var (
 
 	sqliteDriverName = "sqlite3"
 
-	tenantCache            *cache.Cache
-	tenantPlayerCache      *cache.Cache
-	tenantCompetitionCache *cache.Cache
+	tenantCache                   *cache.Cache
+	tenantPlayerCache             *cache.Cache
+	tenantCompetitionCache        *cache.Cache
+	competitionBillingReportCache *cache.Cache
 )
 
 // 環境変数を取得する、なければデフォルト値を返す
@@ -72,6 +73,7 @@ func connectAdminDB() (*sqlx.DB, error) {
 	config.Passwd = getEnv("ISUCON_DB_PASSWORD", "isucon")
 	config.DBName = getEnv("ISUCON_DB_NAME", "isuports")
 	config.ParseTime = true
+	config.InterpolateParams = true
 	dsn := config.FormatDSN()
 	return sqlx.Open("mysql", dsn)
 }
@@ -178,12 +180,13 @@ func Run() {
 		e.Logger.Fatalf("failed to connect db: %v", err)
 		return
 	}
-	adminDB.SetMaxOpenConns(10)
+	adminDB.SetMaxOpenConns(15)
 	defer adminDB.Close()
 
 	initializeTenantCache()
-	initializeTenantPlayerCache(context.Background())
-	initializeTenantCompetitionCache(context.Background())
+	initializeTenantPlayerCache()
+	initializeTenantCompetitionCache()
+	initializeCompetitionBillingReportCache()
 
 	port := getEnv("SERVER_APP_PORT", "3000")
 	e.Logger.Infof("starting isuports server on : %s ...", port)
@@ -339,7 +342,7 @@ func retrieveTenantRowFromHeader(c echo.Context) (*TenantRow, error) {
 		); err != nil {
 			return nil, fmt.Errorf("failed to Select tenant: name=%s, %w", tenantName, err)
 		}
-		tenantCache.Set(cacheKey, tenant, 1*time.Minute)
+		tenantCache.Set(cacheKey, tenant, 3*time.Minute)
 	}
 	return &tenant, nil
 }
@@ -379,7 +382,7 @@ func retrievePlayer(ctx context.Context, tenantDB dbOrTx, id string, tenantID in
 		if err := tenantDB.GetContext(ctx, &p, "SELECT * FROM player WHERE id = ?", id); err != nil {
 			return nil, fmt.Errorf("error Select player: id=%s, %w", id, err)
 		}
-		tenantPlayerCache.Set(cacheKey, p, 1*time.Minute)
+		tenantPlayerCache.Set(cacheKey, p, 3*time.Minute)
 	}
 	return &p, nil
 }
@@ -420,7 +423,7 @@ func retrieveCompetition(ctx context.Context, tenantDB dbOrTx, id string, tenant
 		if err := tenantDB.GetContext(ctx, &c, "SELECT * FROM competition WHERE id = ?", id); err != nil {
 			return nil, fmt.Errorf("error Select competition: id=%s, %w", id, err)
 		}
-		tenantCompetitionCache.Set(cacheKey, c, 1*time.Minute)
+		tenantCompetitionCache.Set(cacheKey, c, 3*time.Minute)
 	}
 	return &c, nil
 }
@@ -936,7 +939,7 @@ func playerDisqualifiedHandler(c echo.Context) error {
 	}
 	p.IsDisqualified = true
 	p.UpdatedAt = now
-	tenantPlayerCache.Set(getTenantPlayerCacheKey(v.tenantID, playerID), *p, 1*time.Minute)
+	tenantPlayerCache.Set(getTenantPlayerCacheKey(v.tenantID, playerID), *p, 3*time.Minute)
 
 	res := PlayerDisqualifiedHandlerResult{
 		Player: PlayerDetail{
@@ -1050,7 +1053,7 @@ func competitionFinishHandler(c echo.Context) error {
 	// キャッシュ更新
 	comp.FinishedAt = sql.NullInt64{Valid: true, Int64: now}
 	comp.UpdatedAt = now
-	tenantCompetitionCache.Set(getTenantCompetitionCacheKey(v.tenantID, id), *comp, 1*time.Minute)
+	tenantCompetitionCache.Set(getTenantCompetitionCacheKey(v.tenantID, id), *comp, 3*time.Minute)
 
 	// billing reportの計算を行う
 	err = createBillingReportByCompetition(ctx, tenantDB, v.tenantID, comp.ID)
@@ -1433,7 +1436,7 @@ func competitionRankingHandler(c echo.Context) error {
 }
 
 func recreateCompetitionRank(ctx context.Context, tx *sqlx.Tx, tenantID int64, competitionID string) error {
-	ranks := make([]CompetitionRank, 0, 100)
+	ranks := make([]CompetitionRank, 0, 1000)
 	if err := tx.SelectContext(
 		ctx,
 		&ranks,
@@ -1665,8 +1668,9 @@ func initializeHandler(c echo.Context) error {
 	c.Logger().Infof("finish initialize script")
 
 	initializeTenantCache()
-	initializeTenantPlayerCache(context.Background())
-	initializeTenantCompetitionCache(context.Background())
+	initializeTenantPlayerCache()
+	initializeTenantCompetitionCache()
+	initializeCompetitionBillingReportCache()
 
 	c.Logger().Infof("start initialize billing report")
 	eg, ctx := errgroup.WithContext(context.Background())
@@ -1714,21 +1718,24 @@ func initializeHandler(c echo.Context) error {
 func getTenantCacheKey(name string) string {
 	return fmt.Sprintf("/tenant/%s", name)
 }
-func initializeTenantCache() error {
-	tenantCache = cache.New(1*time.Minute, 1*time.Minute)
-	return nil
+func initializeTenantCache() {
+	tenantCache = cache.New(3*time.Minute, 3*time.Minute)
 }
 func getTenantPlayerCacheKey(tenantID int64, playerID string) string {
 	return fmt.Sprintf("/tenant/%d/player/%s", tenantID, playerID)
 }
-func initializeTenantPlayerCache(ctx context.Context) error {
-	tenantPlayerCache = cache.New(1*time.Minute, 1*time.Minute)
-	return nil
+func initializeTenantPlayerCache() {
+	tenantPlayerCache = cache.New(3*time.Minute, 3*time.Minute)
 }
 func getTenantCompetitionCacheKey(tenantID int64, competitionID string) string {
 	return fmt.Sprintf("/tenant/%d/competition/%s", tenantID, competitionID)
 }
-func initializeTenantCompetitionCache(ctx context.Context) error {
-	tenantCompetitionCache = cache.New(1*time.Minute, 1*time.Minute)
-	return nil
+func initializeTenantCompetitionCache() {
+	tenantCompetitionCache = cache.New(3*time.Minute, 3*time.Minute)
+}
+func getCompetitionBillingReportCacheKey(competitionID string) string {
+	return fmt.Sprintf("/competition/%s/billing_report", competitionID)
+}
+func initializeCompetitionBillingReportCache() {
+	competitionBillingReportCache = cache.New(3*time.Minute, 3*time.Minute)
 }
