@@ -4,10 +4,10 @@ UPDATE id_generator SET id=2678400000 WHERE stub='a';
 ALTER TABLE id_generator AUTO_INCREMENT=2678400000;
 
 DELETE FROM visit_history2;
-INSERT INTO visit_history2
-SELECT tenant_id, competition_id, player_id, MIN(created_at) AS created_at, MAX(updated_at) AS updated_at
-FROM visit_history
-GROUP BY tenant_id, competition_id, player_id;
+-- INSERT INTO visit_history2
+-- SELECT tenant_id, competition_id, player_id, MIN(created_at) AS created_at, MAX(updated_at) AS updated_at
+-- FROM visit_history
+-- GROUP BY tenant_id, competition_id, player_id;
 
 DROP TABLE IF EXISTS billing_report;
 CREATE TABLE billing_report
