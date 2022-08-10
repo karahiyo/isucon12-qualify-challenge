@@ -15,11 +15,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.50'
-          memory: 50M
+          cpus: '1'
+          memory: 250M
         reservations:
-          cpus: '0.50'
-          memory: 50M
+          cpus: '1'
+          memory: 250M
 
   webapp:
     build: ./webapp/go
@@ -60,6 +60,7 @@ services:
     volumes:
       - ./webapp/sql/admin/:/docker-entrypoint-initdb.d
       - mysql:/var/lib/mysql
+      - ./mysql/my.cnf:/etc/my.cnf
     ports:
       - 13306:3306
     restart: always
