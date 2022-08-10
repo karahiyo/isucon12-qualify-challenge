@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/patrickmn/go-cache"
+	"golang.org/x/sync/errgroup"
 	"io"
 	"net/http"
 	_ "net/http/pprof"
@@ -18,7 +19,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
@@ -1630,14 +1630,10 @@ func initializeHandler(c echo.Context) error {
 	initializeTenantCompetitionCache(context.Background())
 
 	c.Logger().Infof("start initialize billing report")
-	ctx := context.Background()
-	wg := sync.WaitGroup{}
+	eg, ctx := errgroup.WithContext(context.Background())
 	for i := 1; i <= 100; i++ {
-		wg.Add(1)
-		err := func() error {
-			defer wg.Done()
-
-			tenantID := int64(i)
+		tenantID := int64(i)
+		eg.Go(func() error {
 			tenantDB, err := connectToTenantDB(tenantID)
 			if err != nil {
 				return fmt.Errorf("failed to connectToTenantDB: %w", err)
@@ -1662,12 +1658,11 @@ func initializeHandler(c echo.Context) error {
 			}
 
 			return nil
-		}()
-		if err != nil {
-			return fmt.Errorf("failed to initialize tenantdb: %w", err)
-		}
+		})
 	}
-	wg.Wait()
+	if err := eg.Wait(); err != nil {
+		return fmt.Errorf("failed to initialize tenantdb: %w", err)
+	}
 	c.Logger().Infof("finish initialize billing report")
 
 	res := InitializeHandlerResult{

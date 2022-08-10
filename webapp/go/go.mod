@@ -1,4 +1,4 @@
-module github.com/isucon/isucon12-qualify/webapp/go
+module github.com/karahiyo/isucon12-qualify-challenge/webapp/go
 
 go 1.18
 
@@ -12,6 +12,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.13
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/shogo82148/go-sql-proxy v0.6.1
+	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 )
 
 require (
