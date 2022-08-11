@@ -54,6 +54,7 @@ var (
 	tenantPlayerCache             *cache.Cache
 	tenantCompetitionCache        *cache.Cache
 	competitionBillingReportCache *cache.Cache
+	playerScoreDetailCache        *cache.Cache
 )
 
 // 環境変数を取得する、なければデフォルト値を返す
@@ -187,6 +188,7 @@ func Run() {
 	initializeTenantPlayerCache()
 	initializeTenantCompetitionCache()
 	initializeCompetitionBillingReportCache()
+	initializePlayerScoreDetailCache()
 
 	port := getEnv("SERVER_APP_PORT", "3000")
 	e.Logger.Infof("starting isuports server on : %s ...", port)
@@ -1321,6 +1323,7 @@ func playerHandler(c echo.Context) error {
 	if playerID == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "player_id is required")
 	}
+
 	p, err := retrievePlayer(ctx, tenantDB, playerID, v.tenantID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -1330,7 +1333,12 @@ func playerHandler(c echo.Context) error {
 	}
 
 	psds := []PlayerScoreDetail{}
-	query := `
+	cacheKey := getPlayerScoreDetailCacheKey(playerID)
+	cachedPsds, found := playerScoreDetailCache.Get(cacheKey)
+	if found {
+		psds = cachedPsds.([]PlayerScoreDetail)
+	} else {
+		query := `
 WITH player_score_per_competition AS (
   SELECT competition_id, score, MAX(row_num) as row_num
   FROM player_score WHERE tenant_id = ? AND player_id = ? 
@@ -1339,17 +1347,20 @@ WITH player_score_per_competition AS (
 SELECT competition.title AS competition_title, score AS score
 FROM player_score_per_competition ps JOIN competition ON ps.competition_id = competition.id
 `
-	if err := tenantDB.SelectContext(
-		ctx,
-		&psds,
-		query,
-		v.tenantID,
-		p.ID,
-	); err != nil {
-		// スコアが記録されてない場合はありうる。エラーとせず後続処理を継続
-		if !errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("error Select player_score: tenantID=%d, playerID=%s, %w", v.tenantID, p.ID, err)
+		if err := tenantDB.SelectContext(
+			ctx,
+			&psds,
+			query,
+			v.tenantID,
+			p.ID,
+		); err != nil {
+			// スコアが記録されてない場合はありうる。エラーとせず後続処理を継続
+			if !errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("error Select player_score: tenantID=%d, playerID=%s, %w", v.tenantID, p.ID, err)
+			}
 		}
+
+		playerScoreDetailCache.Set(cacheKey, psds, 1*time.Second)
 	}
 
 	res := SuccessResult{
@@ -1699,6 +1710,7 @@ func initializeHandler(c echo.Context) error {
 	initializeTenantPlayerCache()
 	initializeTenantCompetitionCache()
 	initializeCompetitionBillingReportCache()
+	initializePlayerScoreDetailCache()
 
 	c.Logger().Infof("start initialize billing report")
 	eg, ctx := errgroup.WithContext(context.Background())
@@ -1766,4 +1778,10 @@ func getCompetitionBillingReportCacheKey(competitionID string) string {
 }
 func initializeCompetitionBillingReportCache() {
 	competitionBillingReportCache = cache.New(3*time.Minute, 3*time.Minute)
+}
+func getPlayerScoreDetailCacheKey(playerID string) string {
+	return fmt.Sprintf("/player/%s/score_detail", playerID)
+}
+func initializePlayerScoreDetailCache() {
+	playerScoreDetailCache = cache.New(1*time.Second, 1*time.Second)
 }
