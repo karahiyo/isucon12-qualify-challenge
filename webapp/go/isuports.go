@@ -559,6 +559,9 @@ ON DUPLICATE KEY UPDATE player_count = :player_count, visitor_count = :visitor_c
 		return fmt.Errorf("failed to insert into billing_report: %w", err)
 	}
 
+	cacheKey := getCompetitionBillingReportCacheKey(competitionID)
+	competitionBillingReportCache.Set(cacheKey, *report, 3*time.Minute)
+
 	return nil
 }
 
@@ -583,16 +586,24 @@ func getBillingReportByCompetition(ctx context.Context, tenantDB dbOrTx, tenantI
 	}
 
 	report := BillingReport{}
-	if err := adminDB.GetContext(
-		ctx,
-		&report,
-		`SELECT * FROM billing_report WHERE competition_id = ?`,
-		comp.ID,
-	); err != nil {
-		if err == sql.ErrNoRows {
-			return &BillingReport{CompetitionID: comp.ID, CompetitionTitle: comp.Title}, nil
+	cacheKey := getCompetitionBillingReportCacheKey(competitionID)
+	cachedReport, found := competitionBillingReportCache.Get(cacheKey)
+	if found {
+		report = cachedReport.(BillingReport)
+	} else {
+		if err := adminDB.GetContext(
+			ctx,
+			&report,
+			`SELECT * FROM billing_report WHERE competition_id = ?`,
+			comp.ID,
+		); err != nil {
+			if err == sql.ErrNoRows {
+				return &BillingReport{CompetitionID: comp.ID, CompetitionTitle: comp.Title}, nil
+			}
+			return nil, fmt.Errorf("error Select billing_report: competitionID=%s, %w", comp.ID, err)
 		}
-		return nil, fmt.Errorf("error Select billing_report: competitionID=%s, %w", comp.ID, err)
+
+		competitionBillingReportCache.Set(cacheKey, report, 3*time.Minute)
 	}
 
 	return &report, nil
