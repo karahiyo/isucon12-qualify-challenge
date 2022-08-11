@@ -8,6 +8,7 @@ small_bench: cleanlog
 BENCH_RESULT_DIR := $(CURDIR)/bench_result/$(shell date +"%Y%m%d_%H%M%S")
 run_bench_and_collect_bench_result:
 	$(MAKE) cleanlog
+	mkdir -p $(BENCH_RESULT_DIR)
 	docker compose exec bench ./bench | tee $(BENCH_RESULT_DIR)/bench.out
 	$(MAKE) alp > $(BENCH_RESULT_DIR)/alp.out
 	$(MAKE) sqlite-trace > $(BENCH_RESULT_DIR)/sqlite-trace.out
