@@ -1331,13 +1331,10 @@ func playerHandler(c echo.Context) error {
 
 	psds := []PlayerScoreDetail{}
 	query := `
-WITH player_score_per_competition AS (
-  SELECT competition_id, score, MAX(row_num) as row_num
-  FROM player_score WHERE tenant_id = ? AND player_id = ? 
-  GROUP BY competition_id   
-)
-SELECT competition.title AS competition_title, score AS score
-FROM player_score_per_competition ps JOIN competition ON ps.competition_id = competition.id
+SELECT competition.title AS competition_title, ps.score
+FROM player_score ps
+JOIN competition ON ps.competition_id = competition.id
+WHERE ps.tenant_id = ? AND ps.player_id = ? 
 `
 	if err := tenantDB.SelectContext(
 		ctx,
@@ -1476,10 +1473,9 @@ SELECT
        ps.player_id as player_id,
        p.display_name AS player_display_name
 FROM (
-    SELECT competition_id, player_id, score, MAX(row_num) as row_num
+    SELECT competition_id, player_id, score, row_num
     FROM player_score
 	WHERE tenant_id = ? AND competition_id = ? 
-	GROUP BY player_id
 ) ps 
 JOIN player p ON p.id = ps.player_id
 `,
