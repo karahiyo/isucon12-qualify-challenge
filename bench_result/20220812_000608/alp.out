@@ -1,0 +1,18 @@
+docker compose logs nginx --tail 20000 --no-log-prefix | \
+		alp ltsv --sort sum --reverse -o count,2xx,3xx,4xx,5xx,method,uri,min,max,sum,avg,p99 -m "/api/player/competition/.+/ranking,/api/admin/tenants/billing,/api/organizer/players/add,/api/player/player/.+,/api/organizer/competition/.+/score,/api/organizer/competition/.+/finish,/api/organizer/player/.+/disqualified,/js,/css,/api/me"
++-------+-------+-----+-----+-----+--------+---------------------------------------+-------+--------+-----------+-------+--------+
+| COUNT |  2XX  | 3XX | 4XX | 5XX | METHOD |                  URI                  |  MIN  |  MAX   |    SUM    |  AVG  |  P99   |
++-------+-------+-----+-----+-----+--------+---------------------------------------+-------+--------+-----------+-------+--------+
+| 5714  | 5309  | 0   | 405 | 0   | GET    | /api/player/competition/.+/ranking    | 0.013 | 19.046 | 10271.753 | 1.798 | 8.176  |
+| 13403 | 13345 | 0   | 58  | 0   | GET    | /api/player/player/.+                 | 0.003 | 1.973  | 3618.068  | 0.270 | 0.952  |
+| 467   | 465   | 0   | 2   | 0   | GET    | /api/player/competitions              | 0.022 | 1.313  | 134.405   | 0.288 | 0.981  |
+| 72    | 70    | 0   | 2   | 0   | POST   | /api/organizer/competition/.+/score   | 0.282 | 8.803  | 103.540   | 1.438 | 8.803  |
+| 60    | 59    | 0   | 1   | 0   | GET    | /api/organizer/billing                | 0.093 | 13.100 | 58.823    | 0.980 | 13.100 |
+| 20    | 19    | 0   | 1   | 0   | GET    | /api/admin/tenants/billing            | 0.275 | 4.684  | 28.477    | 1.424 | 4.684  |
+| 63    | 63    | 0   | 0   | 0   | GET    | /api/organizer/players                | 0.027 | 1.036  | 19.047    | 0.302 | 1.036  |
+| 64    | 63    | 0   | 1   | 0   | POST   | /api/organizer/competition/.+/finish  | 0.032 | 1.313  | 18.033    | 0.282 | 1.313  |
+| 63    | 63    | 0   | 0   | 0   | POST   | /api/organizer/competitions/add       | 0.032 | 0.929  | 16.939    | 0.269 | 0.929  |
+| 1     | 1     | 0   | 0   | 0   | POST   | /api/admin/tenants/add                | 1.795 | 1.795  | 1.795     | 1.795 | 1.795  |
+| 4     | 4     | 0   | 0   | 0   | POST   | /api/organizer/players/add            | 0.096 | 0.431  | 0.835     | 0.209 | 0.431  |
+| 2     | 2     | 0   | 0   | 0   | POST   | /api/organizer/player/.+/disqualified | 0.085 | 0.302  | 0.387     | 0.194 | 0.302  |
++-------+-------+-----+-----+-----+--------+---------------------------------------+-------+--------+-----------+-------+--------+
