@@ -51,6 +51,9 @@ var (
 
 	sqliteDriverName = "sqlite3"
 
+	// テナントDBのコネクションを保持
+	tenantDBConnMap sync.Map
+
 	tenantCache                   *cache.Cache
 	tenantPlayerCache             *cache.Cache
 	tenantCompetitionCache        *cache.Cache
@@ -85,26 +88,22 @@ func tenantDBPath(id int64) string {
 	return filepath.Join(tenantDBDir, fmt.Sprintf("%d.db", id))
 }
 
-// テナントDBのコネクションを保持
-var tenantDBConnMap = sync.Map{}
-
 // テナントDBに接続する
 func connectToTenantDB(id int64) (*sqlx.DB, error) {
-	storedDB, ok := tenantDBConnMap.Load(id)
-	if ok {
+	p := tenantDBPath(id)
+	if storedDB, ok := tenantDBConnMap.Load(p); ok {
 		return storedDB.(*sqlx.DB), nil
 	}
 
 	// about SQLite
 	// - URI option: https://www.sqlite.org/c3ref/open.html
 	// - about JOURNAL_MODE: https://nave-kazu.hatenablog.com/entry/2015/12/18/140634
-	p := tenantDBPath(id)
 	db, err := sqlx.Open(sqliteDriverName, fmt.Sprintf("file:%s?mode=rw", p))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open tenant DB: %w", err)
 	}
 
-	tenantDBConnMap.Store(id, db)
+	tenantDBConnMap.Store(p, db)
 
 	return db, nil
 }
@@ -147,6 +146,8 @@ func Run() {
 		sqlLogger io.Closer
 		err       error
 	)
+	tenantDBConnMap = sync.Map{}
+
 	// sqliteのクエリログを出力する設定
 	// 環境変数 ISUCON_SQLITE_TRACE_FILE を設定すると、そのファイルにクエリログをJSON形式で出力する
 	// 未設定なら出力しない
@@ -1697,6 +1698,8 @@ func initializeHandler(c echo.Context) error {
 		return fmt.Errorf("error exec.Command: %s %e", string(out), err)
 	}
 	c.Logger().Infof("finish initialize script")
+
+	tenantDBConnMap = sync.Map{}
 
 	initializeTenantCache()
 	initializeTenantPlayerCache()
