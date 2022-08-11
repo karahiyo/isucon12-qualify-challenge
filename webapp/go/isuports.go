@@ -535,7 +535,13 @@ type VisitHistorySummaryRow struct {
 	MinCreatedAt int64  `db:"min_created_at"`
 }
 
-func createBillingReportByCompetition(ctx context.Context, tenantDB dbOrTx, tenantID int64, competitionID string) error {
+func createBillingReportByCompetition(ctx context.Context, tenantID int64, competitionID string) error {
+	tenantDB, err := connectToTenantDB(tenantID)
+	if err != nil {
+		return err
+	}
+	defer tenantDB.Close()
+
 	report, err := calcBillingReportByCompetition(ctx, tenantDB, tenantID, competitionID)
 	if err != nil {
 		return fmt.Errorf("failed to calcBillingReportByCompetition: %w", err)
@@ -1055,11 +1061,13 @@ func competitionFinishHandler(c echo.Context) error {
 	comp.UpdatedAt = now
 	tenantCompetitionCache.Set(getTenantCompetitionCacheKey(v.tenantID, id), *comp, 3*time.Minute)
 
-	// billing reportの計算を行う
-	err = createBillingReportByCompetition(ctx, tenantDB, v.tenantID, comp.ID)
-	if err != nil {
-		c.Logger().Errorf("failed to calcBillingReportByCompetition: %w", err)
-	}
+	// billing reportの計算を非同期で行う
+	go func() {
+		err = createBillingReportByCompetition(context.Background(), v.tenantID, comp.ID)
+		if err != nil {
+			c.Logger().Errorf("failed to calcBillingReportByCompetition: %w", err)
+		}
+	}()
 
 	return c.JSON(http.StatusOK, SuccessResult{Status: true})
 }
@@ -1694,7 +1702,7 @@ func initializeHandler(c echo.Context) error {
 			}
 
 			for _, comp := range cs {
-				err := createBillingReportByCompetition(ctx, tenantDB, tenantID, comp.ID)
+				err := createBillingReportByCompetition(ctx, tenantID, comp.ID)
 				if err != nil {
 					return fmt.Errorf("failed to calcBillingReportByCompetition: %w", err)
 				}
