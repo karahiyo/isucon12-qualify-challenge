@@ -1146,8 +1146,8 @@ func competitionScoreHandler(c echo.Context) error {
 	}
 
 	var rowNum int64
-	// TODO: ユーザごとに1レコードのみに絞る
-	playerScoreRows := []PlayerScoreRow{}
+	now := time.Now().Unix()
+	playerScoreRowMap := map[string]PlayerScoreRow{}
 	for {
 		rowNum++
 		row, err := r.Read()
@@ -1182,8 +1182,7 @@ func competitionScoreHandler(c echo.Context) error {
 		if err != nil {
 			return fmt.Errorf("error dispenseID: %w", err)
 		}
-		now := time.Now().Unix()
-		playerScoreRows = append(playerScoreRows, PlayerScoreRow{
+		ps := PlayerScoreRow{
 			ID:            id,
 			TenantID:      v.tenantID,
 			PlayerID:      playerID,
@@ -1192,7 +1191,14 @@ func competitionScoreHandler(c echo.Context) error {
 			RowNum:        rowNum,
 			CreatedAt:     now,
 			UpdatedAt:     now,
-		})
+		}
+		// 同一プレイヤーのスコアが複数ある場合、CSVファイルを上から順になめたときにより後ろに記録されているものだけを残す
+		playerScoreRowMap[playerID] = ps
+	}
+
+	var playerScoreRows []PlayerScoreRow
+	for _, ps := range playerScoreRowMap {
+		playerScoreRows = append(playerScoreRows, ps)
 	}
 
 	tx := tenantDB.MustBeginTx(ctx, nil)
@@ -1216,11 +1222,14 @@ func competitionScoreHandler(c echo.Context) error {
 	if err != nil {
 		return fmt.Errorf("error recreateCompetitionRank: tenantID:%d, competitionID:%s, err:%w", v.tenantID, competitionID, err)
 	}
-	tx.Commit()
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("error failed to tx.Commit: %w", err)
+	}
 
 	return c.JSON(http.StatusOK, SuccessResult{
 		Status: true,
-		Data:   ScoreHandlerResult{Rows: int64(len(playerScoreRows))},
+		Data:   ScoreHandlerResult{Rows: rowNum - 1},
 	})
 }
 
@@ -1477,7 +1486,7 @@ JOIN player p ON p.id = ps.player_id
 		tenantID,
 		competitionID,
 	); err != nil {
-		return fmt.Errorf("error Select rank: tenantID=%d, competitionID=%s, rankAfter=%d, %w", tenantID, competitionID, err)
+		return fmt.Errorf("error Select rank: tenantID=%d, competitionID=%s, %w", tenantID, competitionID, err)
 	}
 
 	adminTx := adminDB.MustBeginTx(ctx, nil)
