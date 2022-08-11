@@ -1334,17 +1334,11 @@ func playerHandler(c echo.Context) error {
 		return fmt.Errorf("error retrievePlayer: %w", err)
 	}
 
-	psds := []PlayerScoreDetail{}
-	query := `
-SELECT competition.title AS competition_title, ps.score
-FROM player_score ps
-JOIN competition ON ps.competition_id = competition.id
-WHERE ps.tenant_id = ? AND ps.player_id = ? 
-`
+	pss := []PlayerScoreRow{}
 	if err := tenantDB.SelectContext(
 		ctx,
-		&psds,
-		query,
+		&pss,
+		`SELECT competition_id, score FROM player_score WHERE tenant_id = ? AND player_id = ?`,
 		v.tenantID,
 		p.ID,
 	); err != nil {
@@ -1352,6 +1346,23 @@ WHERE ps.tenant_id = ? AND ps.player_id = ?
 		if !errors.Is(err, sql.ErrNoRows) {
 			return fmt.Errorf("error Select player_score: tenantID=%d, playerID=%s, %w", v.tenantID, p.ID, err)
 		}
+	}
+
+	psds := make([]PlayerScoreDetail, 0, len(pss))
+	for _, ps := range pss {
+		comp, err := retrieveCompetition(ctx, tenantDB, ps.CompetitionID, v.tenantID)
+		if err != nil {
+			// 存在しない大会
+			if errors.Is(err, sql.ErrNoRows) {
+				return echo.NewHTTPError(http.StatusNotFound, "competition not found")
+			}
+			return fmt.Errorf("error retrieveCompetition: %w", err)
+		}
+
+		psds = append(psds, PlayerScoreDetail{
+			CompetitionTitle: comp.Title,
+			Score:            ps.Score,
+		})
 	}
 
 	res := SuccessResult{
