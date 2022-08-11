@@ -59,10 +59,8 @@ pt-query-digest:
 
 ALPM="/api/player/competition/.+/ranking,/api/admin/tenants/billing,/api/organizer/players/add,/api/player/player/.+,/api/organizer/competition/.+/score,/api/organizer/competition/.+/finish,/api/organizer/player/.+/disqualified,/js,/css,/api/me"
 OUTFORMAT=count,2xx,3xx,4xx,5xx,method,uri,min,max,sum,avg,p99
-NGINX_LOG_LIMIT=10000
+NGINX_LOG_LIMIT=50000
 .PHONY: alp
 alp:
-	docker compose logs nginx --tail $(NGINX_LOG_LENGTH) --no-log-prefix | \
+	docker compose logs nginx --tail $(NGINX_LOG_LIMIT) --no-log-prefix | \
 		alp ltsv --sort sum --reverse -o $(OUTFORMAT) -m $(ALPM)
-
-
