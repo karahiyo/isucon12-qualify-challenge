@@ -1217,14 +1217,14 @@ func competitionScoreHandler(c echo.Context) error {
 			return fmt.Errorf("error bulk insert player_score: %w", err)
 		}
 	}
-
-	err = recreateCompetitionRank(ctx, tx, v.tenantID, competitionID)
-	if err != nil {
-		return fmt.Errorf("error recreateCompetitionRank: tenantID:%d, competitionID:%s, err:%w", v.tenantID, competitionID, err)
-	}
 	err = tx.Commit()
 	if err != nil {
 		return fmt.Errorf("error failed to tx.Commit: %w", err)
+	}
+
+	err = recreateCompetitionRank(context.Background(), v.tenantID, competitionID)
+	if err != nil {
+		c.Logger().Errorf("error recreateCompetitionRank: tenantID:%d, competitionID:%s, err:%w", v.tenantID, competitionID, err)
 	}
 
 	return c.JSON(http.StatusOK, SuccessResult{
@@ -1460,9 +1460,15 @@ func competitionRankingHandler(c echo.Context) error {
 	return c.JSON(http.StatusOK, res)
 }
 
-func recreateCompetitionRank(ctx context.Context, tx *sqlx.Tx, tenantID int64, competitionID string) error {
+func recreateCompetitionRank(ctx context.Context, tenantID int64, competitionID string) error {
+	tenantDB, err := connectToTenantDB(tenantID)
+	if err != nil {
+		return err
+	}
+	defer tenantDB.Close()
+
 	ranks := make([]CompetitionRank, 0, 1000)
-	if err := tx.SelectContext(
+	if err := tenantDB.SelectContext(
 		ctx,
 		&ranks,
 		`
