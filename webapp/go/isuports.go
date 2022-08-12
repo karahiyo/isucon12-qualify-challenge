@@ -690,8 +690,8 @@ func calcBillingReportByCompetition(ctx context.Context, tenantDB dbOrTx, tenant
 	if err := tenantDB.SelectContext(
 		ctx,
 		&scoredPlayerIDs,
-		"SELECT player_id FROM player_score WHERE tenant_id = ? AND competition_id = ?",
-		tenantID, comp.ID,
+		"SELECT player_id FROM player_score WHERE competition_id = ?",
+		comp.ID,
 	); err != nil && err != sql.ErrNoRows {
 		return nil, fmt.Errorf("error Select count player_score: tenantID=%d, competitionID=%s, %w", tenantID, competitionID, err)
 	}
@@ -1239,8 +1239,7 @@ func competitionScoreHandler(c echo.Context) error {
 
 	tx := tenantDB.MustBeginTx(ctx, nil)
 	if _, err := tx.ExecContext(ctx,
-		"DELETE FROM player_score WHERE tenant_id = ? AND competition_id = ?",
-		v.tenantID,
+		"DELETE FROM player_score WHERE competition_id = ?",
 		competitionID,
 	); err != nil {
 		return fmt.Errorf("error Delete player_score: tenantID=%d, competitionID=%s, %w", v.tenantID, competitionID, err)
@@ -1365,12 +1364,12 @@ func playerHandler(c echo.Context) error {
 		return fmt.Errorf("error retrievePlayer: %w", err)
 	}
 
+	query := `SELECT competition_id, score FROM player_score WHERE player_id = ?`
 	pss := []PlayerScoreRow{}
 	if err := tenantDB.SelectContext(
 		ctx,
 		&pss,
-		`SELECT competition_id, score FROM player_score WHERE tenant_id = ? AND player_id = ?`,
-		v.tenantID,
+		query,
 		p.ID,
 	); err != nil {
 		// スコアが記録されてない場合はありうる。エラーとせず後続処理を継続
@@ -1525,14 +1524,10 @@ SELECT
        ps.score AS score, 
        ps.player_id as player_id,
        p.display_name AS player_display_name
-FROM (
-    SELECT competition_id, player_id, score, row_num
-    FROM player_score
-	WHERE tenant_id = ? AND competition_id = ? 
-) ps 
+FROM player_score ps 
 JOIN player p ON p.id = ps.player_id
+WHERE ps.competition_id = ? 
 `,
-		tenantID,
 		competitionID,
 	); err != nil {
 		return fmt.Errorf("error Select rank: tenantID=%d, competitionID=%s, %w", tenantID, competitionID, err)
