@@ -52,7 +52,7 @@ var (
 	sqliteDriverName = "sqlite3"
 
 	// テナントDBのコネクションを保持
-	tenantDBConnMap sync.Map
+	tenantDBConnMap *sync.Map
 
 	tenantCache                   *cache.Cache
 	tenantPlayerCache             *cache.Cache
@@ -167,7 +167,7 @@ func Run() {
 		sqlLogger io.Closer
 		err       error
 	)
-	tenantDBConnMap = sync.Map{}
+	tenantDBConnMap = new(sync.Map)
 
 	// sqliteのクエリログを出力する設定
 	// 環境変数 ISUCON_SQLITE_TRACE_FILE を設定すると、そのファイルにクエリログをJSON形式で出力する
@@ -466,8 +466,8 @@ func retrieveCompetition(ctx context.Context, tenantDB dbOrTx, id string, tenant
 }
 
 type PlayerScoreRow struct {
-	TenantID      int64  `db:"tenant_id"`
-	ID            string `db:"id"`
+	//TenantID      int64  `db:"tenant_id"`
+	//ID            string `db:"id"`
 	PlayerID      string `db:"player_id"`
 	CompetitionID string `db:"competition_id"`
 	Score         int64  `db:"score"`
@@ -690,10 +690,10 @@ func calcBillingReportByCompetition(ctx context.Context, tenantDB dbOrTx, tenant
 	if err := tenantDB.SelectContext(
 		ctx,
 		&scoredPlayerIDs,
-		"SELECT player_id FROM player_score WHERE competition_id = ?",
+		"SELECT player_id FROM player_score2 WHERE competition_id = ?",
 		comp.ID,
 	); err != nil && err != sql.ErrNoRows {
-		return nil, fmt.Errorf("error Select count player_score: tenantID=%d, competitionID=%s, %w", tenantID, competitionID, err)
+		return nil, fmt.Errorf("error Select count player_score2: tenantID=%d, competitionID=%s, %w", tenantID, competitionID, err)
 	}
 	for _, pid := range scoredPlayerIDs {
 		// スコアが登録されている参加者
@@ -1214,13 +1214,13 @@ func competitionScoreHandler(c echo.Context) error {
 				fmt.Sprintf("error strconv.ParseUint: scoreStr=%s, %s", scoreStr, err),
 			)
 		}
-		id, err := dispenseID(ctx)
-		if err != nil {
-			return fmt.Errorf("error dispenseID: %w", err)
-		}
+		//id, err := dispenseID(ctx)
+		//if err != nil {
+		//	return fmt.Errorf("error dispenseID: %w", err)
+		//}
 		ps := PlayerScoreRow{
-			ID:            id,
-			TenantID:      v.tenantID,
+			//ID:            id,
+			//TenantID:      v.tenantID,
 			PlayerID:      playerID,
 			CompetitionID: competitionID,
 			Score:         score,
@@ -1239,17 +1239,18 @@ func competitionScoreHandler(c echo.Context) error {
 
 	tx := tenantDB.MustBeginTx(ctx, nil)
 	if _, err := tx.ExecContext(ctx,
-		"DELETE FROM player_score WHERE competition_id = ?",
+		"DELETE FROM player_score2 WHERE competition_id = ?",
 		competitionID,
 	); err != nil {
-		return fmt.Errorf("error Delete player_score: tenantID=%d, competitionID=%s, %w", v.tenantID, competitionID, err)
+		return fmt.Errorf("error Delete player_score2: tenantID=%d, competitionID=%s, %w", v.tenantID, competitionID, err)
 	}
 
 	if len(playerScoreRows) > 0 {
-		if _, err = tx.NamedExecContext(ctx, `INSERT INTO player_score (id, tenant_id, player_id, competition_id, score, row_num, created_at, updated_at) VALUES (:id, :tenant_id, :player_id, :competition_id, :score, :row_num, :created_at, :updated_at)`,
+		//if _, err = tx.NamedExecContext(ctx, `INSERT INTO player_score2 (id, tenant_id, player_id, competition_id, score, row_num, created_at, updated_at) VALUES (:id, :tenant_id, :player_id, :competition_id, :score, :row_num, :created_at, :updated_at)`,
+		if _, err = tx.NamedExecContext(ctx, `INSERT INTO player_score2 (player_id, competition_id, score, row_num, created_at, updated_at) VALUES (:player_id, :competition_id, :score, :row_num, :created_at, :updated_at)`,
 			playerScoreRows,
 		); err != nil {
-			return fmt.Errorf("error bulk insert player_score: %w", err)
+			return fmt.Errorf("error bulk insert player_score2: %w", err)
 		}
 	}
 	err = tx.Commit()
@@ -1364,7 +1365,7 @@ func playerHandler(c echo.Context) error {
 		return fmt.Errorf("error retrievePlayer: %w", err)
 	}
 
-	query := `SELECT competition_id, score FROM player_score WHERE player_id = ?`
+	query := `SELECT competition_id, score FROM player_score2 WHERE player_id = ?`
 	pss := []PlayerScoreRow{}
 	if err := tenantDB.SelectContext(
 		ctx,
@@ -1374,7 +1375,7 @@ func playerHandler(c echo.Context) error {
 	); err != nil {
 		// スコアが記録されてない場合はありうる。エラーとせず後続処理を継続
 		if !errors.Is(err, sql.ErrNoRows) {
-			return fmt.Errorf("error Select player_score: tenantID=%d, playerID=%s, %w", v.tenantID, p.ID, err)
+			return fmt.Errorf("error Select player_score2: tenantID=%d, playerID=%s, %w", v.tenantID, p.ID, err)
 		}
 	}
 
@@ -1524,7 +1525,7 @@ SELECT
        ps.score AS score, 
        ps.player_id as player_id,
        p.display_name AS player_display_name
-FROM player_score ps 
+FROM player_score2 ps 
 JOIN player p ON p.id = ps.player_id
 WHERE ps.competition_id = ? 
 `,
