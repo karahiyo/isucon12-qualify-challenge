@@ -1246,7 +1246,6 @@ func competitionScoreHandler(c echo.Context) error {
 	}
 
 	if len(playerScoreRows) > 0 {
-		//if _, err = tx.NamedExecContext(ctx, `INSERT INTO player_score2 (id, tenant_id, player_id, competition_id, score, row_num, created_at, updated_at) VALUES (:id, :tenant_id, :player_id, :competition_id, :score, :row_num, :created_at, :updated_at)`,
 		if _, err = tx.NamedExecContext(ctx, `INSERT INTO player_score2 (player_id, competition_id, score, row_num, created_at, updated_at) VALUES (:player_id, :competition_id, :score, :row_num, :created_at, :updated_at)`,
 			playerScoreRows,
 		); err != nil {

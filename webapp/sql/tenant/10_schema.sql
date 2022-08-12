@@ -20,16 +20,16 @@ CREATE TABLE player (
   updated_at BIGINT NOT NULL
 );
 
-CREATE TABLE player_score (
-  id VARCHAR(255) NOT NULL PRIMARY KEY,
-  tenant_id BIGINT NOT NULL,
-  player_id VARCHAR(255) NOT NULL,
-  competition_id VARCHAR(255) NOT NULL,
-  score BIGINT NOT NULL,
-  row_num BIGINT NOT NULL,
-  created_at BIGINT NOT NULL,
-  updated_at BIGINT NOT NULL
-);
+-- CREATE TABLE player_score (
+--   id VARCHAR(255) NOT NULL PRIMARY KEY,
+--   tenant_id BIGINT NOT NULL,
+--   player_id VARCHAR(255) NOT NULL,
+--   competition_id VARCHAR(255) NOT NULL,
+--   score BIGINT NOT NULL,
+--   row_num BIGINT NOT NULL,
+--   created_at BIGINT NOT NULL,
+--   updated_at BIGINT NOT NULL
+-- );
 
 CREATE TABLE player_score2
 (
@@ -42,4 +42,4 @@ CREATE TABLE player_score2
     PRIMARY KEY (player_id, competition_id)
 );
 
-CREATE INDEX IF NOT EXISTS comp_player_idx ON player_score2(competition_id, player_id, row_num desc);
+CREATE INDEX IF NOT EXISTS comp_player_idx ON player_score2(competition_id, player_id, score DESC, row_num);
