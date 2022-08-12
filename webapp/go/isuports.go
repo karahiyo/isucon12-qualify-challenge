@@ -90,21 +90,41 @@ func tenantDBPath(id int64) string {
 
 // テナントDBに接続する
 func connectToTenantDB(id int64) (*sqlx.DB, error) {
-	p := tenantDBPath(id)
-	if storedDB, ok := tenantDBConnMap.Load(p); ok {
+	key := fmt.Sprintf("tenantdb:%d?mode=rw", id)
+	if storedDB, ok := tenantDBConnMap.Load(key); ok {
 		return storedDB.(*sqlx.DB), nil
 	}
 
-	// about SQLite
-	// - URI option: https://www.sqlite.org/c3ref/open.html
-	// - about JOURNAL_MODE: https://nave-kazu.hatenablog.com/entry/2015/12/18/140634
-	db, err := sqlx.Open(sqliteDriverName, fmt.Sprintf("file:%s?mode=rw&cache=shared&_journal_mode=WAL&_txlock=immediate", p))
+	p := tenantDBPath(id)
+	// see URI option: https://www.sqlite.org/c3ref/open.html
+	db, err := sqlx.Open(sqliteDriverName, fmt.Sprintf("file:%s?mode=rw&_journal_mode=wal&_txlock=immediate", p))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open tenant DB: %w", err)
 	}
+	// writeは1スレッドのみ
+	// see https://github.com/mattn/go-sqlite3/issues/1022
 	db.SetMaxOpenConns(1)
 
-	tenantDBConnMap.Store(p, db)
+	tenantDBConnMap.Store(key, db)
+
+	return db, nil
+}
+
+// テナントDBにmode=roで接続する
+func connectToTenantDBReadOnlyMode(id int64) (*sqlx.DB, error) {
+	key := fmt.Sprintf("tenantdb:%d?mode=ro", id)
+	if storedDB, ok := tenantDBConnMap.Load(key); ok {
+		return storedDB.(*sqlx.DB), nil
+	}
+
+	p := tenantDBPath(id)
+	db, err := sqlx.Open(sqliteDriverName, fmt.Sprintf("file:%s?mode=ro", p))
+	if err != nil {
+		return nil, fmt.Errorf("failed to open tenant DB: %w", err)
+	}
+	db.SetMaxOpenConns(10)
+
+	tenantDBConnMap.Store(key, db)
 
 	return db, nil
 }
@@ -197,7 +217,7 @@ func Run() {
 		e.Logger.Fatalf("failed to connect db: %v", err)
 		return
 	}
-	adminDB.SetMaxOpenConns(15)
+	adminDB.SetMaxOpenConns(10)
 	defer adminDB.Close()
 
 	initializeTenantCache()
@@ -553,7 +573,7 @@ type VisitHistorySummaryRow struct {
 }
 
 func createBillingReportByCompetition(ctx context.Context, tenantID int64, competitionID string) error {
-	tenantDB, err := connectToTenantDB(tenantID)
+	tenantDB, err := connectToTenantDBReadOnlyMode(tenantID)
 	if err != nil {
 		return err
 	}
@@ -768,7 +788,7 @@ func tenantsBillingHandler(c echo.Context) error {
 				Name:        t.Name,
 				DisplayName: t.DisplayName,
 			}
-			tenantDB, err := connectToTenantDB(t.ID)
+			tenantDB, err := connectToTenantDBReadOnlyMode(t.ID)
 			if err != nil {
 				return fmt.Errorf("failed to connectToTenantDB: %w", err)
 			}
@@ -829,7 +849,7 @@ func playersListHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusForbidden, "role organizer required")
 	}
 
-	tenantDB, err := connectToTenantDB(v.tenantID)
+	tenantDB, err := connectToTenantDBReadOnlyMode(v.tenantID)
 	if err != nil {
 		return fmt.Errorf("error connectToTenantDB: %w", err)
 	}
@@ -1266,7 +1286,7 @@ func billingHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusForbidden, "role organizer required")
 	}
 
-	tenantDB, err := connectToTenantDB(v.tenantID)
+	tenantDB, err := connectToTenantDBReadOnlyMode(v.tenantID)
 	if err != nil {
 		return err
 	}
@@ -1323,7 +1343,7 @@ func playerHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusForbidden, "role player required")
 	}
 
-	tenantDB, err := connectToTenantDB(v.tenantID)
+	tenantDB, err := connectToTenantDBReadOnlyMode(v.tenantID)
 	if err != nil {
 		return err
 	}
@@ -1417,7 +1437,7 @@ func competitionRankingHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusForbidden, "role player required")
 	}
 
-	tenantDB, err := connectToTenantDB(v.tenantID)
+	tenantDB, err := connectToTenantDBReadOnlyMode(v.tenantID)
 	if err != nil {
 		return err
 	}
@@ -1488,7 +1508,7 @@ func competitionRankingHandler(c echo.Context) error {
 }
 
 func recreateCompetitionRank(ctx context.Context, tenantID int64, competitionID string) error {
-	tenantDB, err := connectToTenantDB(tenantID)
+	tenantDB, err := connectToTenantDBReadOnlyMode(tenantID)
 	if err != nil {
 		return err
 	}
@@ -1556,7 +1576,7 @@ func playerCompetitionsHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusForbidden, "role player required")
 	}
 
-	tenantDB, err := connectToTenantDB(v.tenantID)
+	tenantDB, err := connectToTenantDBReadOnlyMode(v.tenantID)
 	if err != nil {
 		return err
 	}
@@ -1580,7 +1600,7 @@ func organizerCompetitionsHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusForbidden, "role organizer required")
 	}
 
-	tenantDB, err := connectToTenantDB(v.tenantID)
+	tenantDB, err := connectToTenantDBReadOnlyMode(v.tenantID)
 	if err != nil {
 		return err
 	}
@@ -1671,7 +1691,7 @@ func meHandler(c echo.Context) error {
 		})
 	}
 
-	tenantDB, err := connectToTenantDB(v.tenantID)
+	tenantDB, err := connectToTenantDBReadOnlyMode(v.tenantID)
 	if err != nil {
 		return fmt.Errorf("error connectToTenantDB: %w", err)
 	}
@@ -1747,7 +1767,7 @@ func initializeHandler(c echo.Context) error {
 	for i := 1; i <= 100; i++ {
 		tenantID := int64(i)
 		eg.Go(func() error {
-			tenantDB, err := connectToTenantDB(tenantID)
+			tenantDB, err := connectToTenantDBReadOnlyMode(tenantID)
 			if err != nil {
 				return fmt.Errorf("failed to connectToTenantDB: %w", err)
 			}
