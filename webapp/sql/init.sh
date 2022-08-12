@@ -28,7 +28,7 @@ mysql -u"$ISUCON_DB_USER" \
 #		"$ISUCON_DB_NAME" ../../initial_data/visit_history2.dump
 
 # SQLiteのデータベースを初期化
-rm -f ../tenant_db/*.db
+rm -f ../tenant_db/*.db ../tenant_db/*.db-shm ../tenant_db/*.db-wal
 cp -r ../../initial_data/*.db ../tenant_db/
 
 # 事前にupdate_tenantdb_initial_data.shで実行する。ここでのupdateはしない
